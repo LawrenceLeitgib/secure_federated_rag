@@ -7,6 +7,44 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa, ed25519
 from cryptography.exceptions import InvalidSignature
 
 
+
+
+def generate_rsa_key_pair() -> tuple[bytes, bytes]:
+    """Generate a new RSA key pair and return them as PEM-encoded bytes."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return private_pem, public_pem
+
+
+def generate_ed25519_key_pair() -> tuple[bytes, bytes]:
+    """Generate a new Ed25519 key pair and return them as PEM-encoded bytes."""
+    private_key = ed25519.Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return private_pem, public_pem
+
+def generate_key_pairs() -> tuple[bytes, bytes]:
+    """Generate a new key pair (Ed25519 by default) and return them as PEM-encoded bytes."""
+    return generate_ed25519_key_pair()
 def sign_data(private_pem: bytes, data: bytes, password: Optional[bytes] = None) -> bytes:
     """Sign `data` using a PEM-encoded private key (Ed25519 or RSA).
 

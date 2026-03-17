@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from app.blockchain.ledger import SimpleLedger
-from app.crypto.hashing import sha256_text
-from app.crypto.symmetric import encrypt_bytes, decrypt_bytes, generate_key
+from app.crypto.symmetric import  decrypt_bytes
 from app.custodians.custodian import (
     Custodian,
-    split_key_dummy,
     reconstruct_key_dummy,
 )
-from app.domain.models import Dataset, User,DataOwner,RetrievalEngine
-from app.ingestion.chunking import chunk_text
-from app.ingestion.merkle import build_merkle_root
+from app.data.chunking import Dataset
+from app.data.dataOwner import DataOwner
+from app.domain.models import User
 from app.retrieval.embeddings import embed_text_dummy
-from app.retrieval.vector_index import SimpleVectorIndex
+from app.retrieval.retrievalEngine import RetrievalEngine
 from app.storage.provider import LocalStorageProvider
 
 
@@ -27,74 +25,62 @@ class SystemOrchestrator:
         self.retrieval_engines: dict[str, RetrievalEngine] = {}
 
     def register_dataOwner(self, dataOwner: DataOwner) -> None:
-        self.ledger.register_DataOwner(dataOwner)
+        self.dataOwners[dataOwner.user_id]=dataOwner
+        self.ledger.register_user(dataOwner.user_id, dataOwner.public_key.decode("utf-8"), dataOwner.private_key)
 
-    def upload_document(
-        self,
-        owner_id: str,
-        dataset_id: str,
-        document_name: str,
-        text: str,
-        chunk_size: int = 300,
-        overlap: int = 50,
-    ) -> Dataset:
-        chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
-
-        dataset = Dataset(
-            dataset_id=dataset_id,
-            owner_id=owner_id,
+    def register_retrievalEngine(self, retrieval_engine: RetrievalEngine) -> None:
+        self.retrieval_engines[retrieval_engine.re_id]=retrieval_engine
+        self.ledger.register_user(retrieval_engine.re_id, retrieval_engine.public_key.decode("utf-8"), retrieval_engine.private_key)
+    
+    
+    def upload_document(self, owner_id: str, document_name: str, text: str) -> Dataset:
+        if(owner_id not in self.dataOwners):
+            raise KeyError("unknown owner")
+        owner=self.dataOwners[owner_id]
+        dataset=owner.upload_document(
+            owner_id=owner.user_id,
             document_name=document_name,
-            chunks=chunks,
+            text=text,
+            custodians=[self.custodian_a, self.custodian_b],
+            storage=self.storage,
+            ledger=self.ledger,
         )
-
-        kek = generate_key()
-        share1, share2 = split_key_dummy(kek)
-        self.custodian_a.store_share(dataset_id, share1)
-        self.custodian_b.store_share(dataset_id, share2)
-
-        leaf_hashes: list[str] = []
-
-        for chunk in dataset.chunks:
-            chunk.hash_value = sha256_text(chunk.text)
-            leaf_hashes.append(chunk.hash_value)
-
-            encrypted_chunk = encrypt_bytes(chunk.text.encode("utf-8"), kek)
-
-            # dummy: we “encrypt” the DEK by just storing the KEK itself
-            encrypted_dek = kek
-
-            chunk.encrypted_data = encrypted_chunk
-            chunk.encrypted_dek = encrypted_dek
-            chunk.embedding = embed_text_dummy(chunk.text)
-
-            self.storage.upload_chunk(
-                chunk_id=chunk.chunk_id,
-                encrypted_chunk=encrypted_chunk,
-                encrypted_dek=encrypted_dek,
-            )
-
-            self.vector_index.add(
-                chunk_id=chunk.chunk_id,
-                embedding=chunk.embedding,
-                text=chunk.text,
-            )
-
-        dataset.merkle_root = build_merkle_root(leaf_hashes)
-        self.datasets[dataset_id] = dataset
-
-        self.ledger.register_dataset(
-            dataset_id=dataset.dataset_id,
-            owner_id=dataset.owner_id,
-            document_name=dataset.document_name,
-            merkle_root=dataset.merkle_root,
-            chunk_ids=[chunk.chunk_id for chunk in dataset.chunks],
-        )
-
+         #sign the dataset registration with the data owner's private key
+        self.ledger.register_dataset(dataset_id=dataset.dataset_id, dataOwner_id=dataset.owner_id, private_key=owner.private_key)
         return dataset
+        
+            
 
-    def grant_access(self, user_id: str, dataset_id: str) -> None:
-        self.ledger.grant_authorization(user_id, dataset_id)
+    def grant_authorization(self,data_owner_id:str,re_id : str, dataset_id: str) -> None:
+        if data_owner_id not in self.dataOwners:
+            raise KeyError(f"Data owner {data_owner_id} not found")
+        if re_id not in self.retrieval_engines:
+            raise KeyError(f"Retrieval engine {re_id} not found")
 
+        self.ledger.add_authorization_entry(
+            dataOwner_id=data_owner_id,
+            dataset_id=dataset_id,
+            re_id=re_id,
+            private_key=self.dataOwners[data_owner_id].private_key,
+        )
+
+
+        
+    def giveEmbeddings(self, owner_id: str, dataset_id: str,re_id: str) -> list[tuple[str, list[float]]]:
+        if not self.ledger.is_authorized(re_id, dataset_id):
+            raise PermissionError(f"Retrieval engine {re_id} is not authorized for dataset {dataset_id}") ##TODO should we check here?
+        dataset = None
+        for dataOwner in self.dataOwners.values():
+            if dataset_id in [d.dataset_id for d in dataOwner.datasets]:
+                dataset = next(d for d in dataOwner.datasets if d.dataset_id == dataset_id)
+                break
+
+        if dataset is None:
+            raise KeyError(f"Dataset {dataset_id} not found")
+
+        return [(chunk.chunk_id, chunk.embedding) for chunk in dataset.chunks]
+
+        
     def query(self, user_id: str, dataset_id: str, query_text: str, k: int = 3) -> list[str]:
         if not self.ledger.is_authorized(user_id, dataset_id):
             raise PermissionError(f"User {user_id} is not authorized for dataset {dataset_id}")

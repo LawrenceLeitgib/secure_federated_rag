@@ -1,6 +1,8 @@
 from __future__ import annotations
+from ast import List
+from dataclasses import dataclass, field, field
 
-from app.domain.models import Chunk
+from app.crypto.hashing import sha256_text
 
 
 def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chunk]:
@@ -19,7 +21,7 @@ def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chun
 
         chunks.append(
             Chunk(
-                chunk_id=f"chunk_{index}",
+                chunk_id=sha256_text(chunk_text_value),
                 text=chunk_text_value,
             )
         )
@@ -31,3 +33,23 @@ def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chun
         index += 1
 
     return chunks
+
+
+@dataclass
+class Chunk:
+    chunk_id: str
+    text: str
+    embedding: list[float] | None = None
+
+@dataclass
+class EncryptedChunk:
+    chunk_id: str
+    encrypted_data: bytes
+    encrypted_dek: bytes
+
+@dataclass
+class Dataset:
+    dataset_id: str
+    owner_id: str #the merkle tree root
+    document_name: str
+    chunks: List[Chunk] = field(default_factory=list)

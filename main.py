@@ -1,15 +1,18 @@
+from app.data.dataOwner import DataOwner
 from app.domain.models import User
+from app.retrieval.retrievalEngine import RetrievalEngine
 from app.services.orchestration import SystemOrchestrator
 
 
 def main() -> None:
     system = SystemOrchestrator()
 
-    owner = User(user_id="owner_1", name="Leonard")
-    reader = User(user_id="reader_1", name="Alice")
+    owner  = DataOwner.create("Alice")
+    reader = User(user_id="reader_1", name="Bob")
+    retrieval_engine = RetrievalEngine.create("RAG Engine")
 
-    system.register_user(owner)
-    system.register_user(reader)
+    system.register_dataOwner(owner)
+    system.register_retrievalEngine(retrieval_engine)
 
     sample_text = """
     Retrieval-Augmented Generation improves question answering by retrieving relevant chunks
@@ -26,36 +29,30 @@ def main() -> None:
 
     dataset = system.upload_document(
         owner_id=owner.user_id,
-        dataset_id="dataset_1",
-        document_name="demo_doc.txt",
+        document_name="RAG Overview",
         text=sample_text,
-        chunk_size=180,
-        overlap=30,
     )
+
+    
 
     print("=== DATASET REGISTERED ===")
     print(f"Dataset ID: {dataset.dataset_id}")
-    print(f"Merkle root: {dataset.merkle_root}")
+    print(f"Owner ID: {dataset.owner_id}")
+    print(f"owner name: {owner.name}")
+    print(f"Document Name: {dataset.document_name}")
+    for i, chunk in enumerate(dataset.chunks):
+        print(f"Chunk {i}: ID={chunk.chunk_id}, Text='{chunk.text[:60]}...'")
     print()
 
-    system.grant_access(user_id=reader.user_id, dataset_id=dataset.dataset_id)
-
-    print("=== LEDGER ===")
-    system.ledger.print_entries()
-    print()
-
-    print("=== QUERY RESULTS ===")
-    results = system.query(
-        user_id=reader.user_id,
+    system.grant_authorization(
+        data_owner_id=owner.user_id,
+        re_id=retrieval_engine.re_id,
         dataset_id=dataset.dataset_id,
-        query_text="How does the system control access to encrypted chunks?",
-        k=2,
     )
-
-    for r in results:
-        print(r)
-        print()
-
+    print(f"Authorization granted to {retrieval_engine.name} for dataset '{dataset.document_name}'")
+    print(f"is authorized: {system.ledger.is_authorized(retrieval_engine.re_id, dataset.dataset_id)}")
+    print("=== LEDGER ENTRIES ===")
+    system.ledger.print_entries()
 
 if __name__ == "__main__":
     main()
