@@ -54,5 +54,36 @@ def main() -> None:
     print("=== LEDGER ENTRIES ===")
     system.ledger.print_entries()
 
+
+    print()
+    print("=== RETRIEVAL ENGINE STARTED ===")
+    print()
+
+
+    system.giveEmbeddings(
+        owner_id=owner.user_id,
+        dataset_id=dataset.dataset_id,
+        re_id=retrieval_engine.re_id,
+    )
+    #print(f"Embeddings given to {retrieval_engine.name} for dataset '{dataset.document_name}'")
+    #print(f"Retrieval Engine Embeddings: {retrieval_engine.embeddings}")
+
+
+
+    query="What is Retrieval-Augmented Generation?"
+    results = system.query(
+        re_id=retrieval_engine.re_id,
+        dataset_id=dataset.dataset_id,
+        query_text=query,
+        k=2,
+    )
+
+    print(f"Query: {query}")
+    print("Results:")
+    for i, (chunk_id, score, plaintext) in enumerate(results):
+        print(f"[{i}] chunk_id={chunk_id} | score={score:.4f} | text='{plaintext[:60]}...'")
+
+
+
 if __name__ == "__main__":
     main()

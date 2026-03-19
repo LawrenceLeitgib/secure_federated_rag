@@ -66,39 +66,39 @@ class SystemOrchestrator:
 
 
         
-    def giveEmbeddings(self, owner_id: str, dataset_id: str,re_id: str) -> list[tuple[str, list[float]]]:
-        if not self.ledger.is_authorized(re_id, dataset_id):
-            raise PermissionError(f"Retrieval engine {re_id} is not authorized for dataset {dataset_id}") ##TODO should we check here?
-        dataset = None
-        for dataOwner in self.dataOwners.values():
-            if dataset_id in [d.dataset_id for d in dataOwner.datasets]:
-                dataset = next(d for d in dataOwner.datasets if d.dataset_id == dataset_id)
-                break
+    def giveEmbeddings(self, owner_id: str, dataset_id: str,re_id: str) -> None:
+        if owner_id not in self.dataOwners:
+            raise KeyError(f"Data owner {owner_id} not found")
+        if re_id not in self.retrieval_engines:
+            raise KeyError(f"Retrieval engine {re_id} not found")
+      
 
-        if dataset is None:
-            raise KeyError(f"Dataset {dataset_id} not found")
-
-        return [(chunk.chunk_id, chunk.embedding) for chunk in dataset.chunks]
+        embeddings = self.dataOwners[owner_id].get_embeddings(dataset_id)
+        self.retrieval_engines[re_id].add_embeddings(embeddings)
 
         
-    def query(self, user_id: str, dataset_id: str, query_text: str, k: int = 3) -> list[str]:
-        if not self.ledger.is_authorized(user_id, dataset_id):
-            raise PermissionError(f"User {user_id} is not authorized for dataset {dataset_id}")
 
-        query_embedding = embed_text_dummy(query_text)
-        results = self.vector_index.search(query_embedding, k=k)
+
+        
+    def query(self, re_id: str, dataset_id: str, query_text: str, k: int = 3) -> list[tuple[str, float, str]]:
+        if not self.ledger.is_authorized(re_id, dataset_id):
+            raise PermissionError(f"User {re_id} is not authorized for dataset {dataset_id}")
+
+      
+        results = self.retrieval_engines[re_id].query(query_text, k=k)
 
         share1 = self.custodian_a.get_share(dataset_id)
         share2 = self.custodian_b.get_share(dataset_id)
         kek = reconstruct_key_dummy(share1, share2)
 
-        decrypted_results: list[str] = []
+        decrypted_results: list[tuple[str, float, str]] = []
 
         for result in results:
-            encrypted_chunk, _ = self.storage.get_chunk(result.chunk_id)
-            plaintext = decrypt_bytes(encrypted_chunk, kek).decode("utf-8")
+            encrypted_chunk = self.storage.get_chunk(result[0])
+            dek = decrypt_bytes(encrypted_chunk.encrypted_dek, kek).decode("utf-8")
+            plaintext = decrypt_bytes(encrypted_chunk.encrypted_data, dek).decode("utf-8")
             decrypted_results.append(
-                f"[chunk_id={result.chunk_id} | score={result.score:.4f}] {plaintext}"
+                (result[0], result[1], plaintext)
             )
 
         return decrypted_results
