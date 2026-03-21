@@ -26,7 +26,7 @@ class CustodianTCPServer:
                     break
 
                 request = decode_message(line)
-                response = self.dispatch(request)
+                response = await self.dispatch(request)
 
                 writer.write(encode_message(response))
                 await writer.drain()
@@ -43,6 +43,7 @@ class CustodianTCPServer:
         action = request.get("action")
         payload = request.get("payload", {})
 
+        print(f"CustodianTCPServer received request: {action}")
         try:
             if action == "store_share":
                 dataset_id: str = payload["dataset_id"]

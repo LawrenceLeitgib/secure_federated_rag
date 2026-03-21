@@ -18,14 +18,17 @@ class CustodianService:
         self.storage_client =   StorageClient()       # storage server
         self.blockchain_client = BlockchainClient() # ledger server
 
-    def store_share(self, dataset_id: str, share: bytes) -> None:
+    async def store_share(self, dataset_id: str, share: bytes) -> None:
+        print(f"Storing share for dataset: {dataset_id}")
         # 1. Store locally in the custodian domain object
         self.custodian.store_share(dataset_id, share)
 
-    def get_share(self, dataset_id: str) -> bytes | None:
+    async def get_share(self, dataset_id: str) -> bytes | None:
+        print(f"Retrieving share for dataset: {dataset_id}")
         return self.custodian.get_share(dataset_id)
     
     async def get_plain_text_chunk(self,user_id: str,chunk_id: str) -> tuple[Chunk | None, bool]:
+        print(f"Retrieving plain text chunk: {chunk_id}")
         if self.blockchain_client is not None:
             # Check if the custodian is authorized to access this dataset
             #if not await self.blockchain_client.is_authorized(user_id, dataset_id):

@@ -17,6 +17,7 @@ class StorageClient:
         reader, writer = await asyncio.open_connection(self.host, self.port)
         try:
             payload = {
+                "dataset_id": chunk.dataset_id,
                 "chunk_id": chunk.chunk_id,
                 "encrypted_data": chunk.encrypted_data.hex(),
                 "encrypted_dek": chunk.encrypted_dek.hex(),

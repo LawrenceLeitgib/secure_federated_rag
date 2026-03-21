@@ -41,6 +41,7 @@ class StorageTCPServer:
     def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
         action = request.get("action")
         payload = request.get("payload", {})
+        print(f"StorageTCPServer received request: {action}")
 
         try:
             if action == "upload_chunk":
@@ -48,8 +49,10 @@ class StorageTCPServer:
                 chunk_id: str = payload["chunk_id"]
                 encrypted_data_hex: str = payload["encrypted_data"]
                 encrypted_dek_hex: str = payload["encrypted_dek"]
+                dataset_id: str = payload.get("dataset_id")
 
                 encrypted_chunk = EncryptedChunk(
+                    dataset_id=dataset_id,
                     chunk_id=chunk_id,
                     encrypted_data=bytes.fromhex(encrypted_data_hex),
                     encrypted_dek=bytes.fromhex(encrypted_dek_hex),

@@ -1,88 +1,64 @@
-from app.data.dataOwner import DataOwner
-from app.domain.models import User
-from app.retrieval.retrievalEngine import RetrievalEngine
-from app.services.orchestration import SystemOrchestrator
+import subprocess
+import time
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).parent
+
+MODULES = {
+    "storage_server": "app.storage.storage_server",
+    "blockchain_server": "app.blockchain.blockchain_server",
+    "custodians_server": "app.custodians.custodian_server",
+    "retrieval_server": "app.retrieval.retrieval_server",
+    "data_owner_client": "app.data_owner.data_owner_client",
+    "user_client": "app.user.user_client",
+}
+
+
+def open_in_new_terminal(name: str, module: str):
+    cmd = [
+        "gnome-terminal",
+        "--title", name,
+        "--",
+        "bash", "-c",
+        f"cd '{PROJECT_ROOT}' && python -m {module}; exec bash"
+    ]
+    return subprocess.Popen(cmd)
 
 
 def main() -> None:
-    system = SystemOrchestrator()
+    processes = []
 
-    owner  = DataOwner.create("Alice")
-    reader = User(user_id="reader_1", name="Bob")
-    retrieval_engine = RetrievalEngine.create("RAG Engine")
+    servers_order = [
+        "storage_server",
+        "blockchain_server",
+        "custodians_server",
+        "retrieval_server",
+    ]
 
-    system.register_dataOwner(owner)
-    system.register_retrievalEngine(retrieval_engine)
+    for srv in servers_order:
+        p = open_in_new_terminal(srv, MODULES[srv])
+        processes.append(p)
+        time.sleep(1.0)
 
-    sample_text = """
-    Retrieval-Augmented Generation improves question answering by retrieving relevant chunks
-    from a knowledge base. In this prototype, data owners upload documents, which are chunked,
-    hashed into a Merkle tree, encrypted, and stored by an untrusted storage provider.
-
-    A blockchain-like ledger keeps metadata such as user registration, dataset registration,
-    Merkle root, and authorizations. Custodians hold key shares and only reconstruct the
-    encryption key when the querying user is authorized.
-
-    The retrieval engine embeds chunks and user queries, then performs similarity search.
-    The most relevant encrypted chunks are fetched, decrypted, and returned as context.
+    time.sleep(3.0)
     """
+    clients_order = [
+        "data_owner_client",
+        "user_client",
+    ]
 
-    dataset = system.upload_document(
-        owner_id=owner.user_id,
-        document_name="RAG Overview",
-        text=sample_text,
-    )
-
-    
-
-    print("=== DATASET REGISTERED ===")
-    print(f"Dataset ID: {dataset.dataset_id}")
-    print(f"Owner ID: {dataset.owner_id}")
-    print(f"owner name: {owner.name}")
-    print(f"Document Name: {dataset.document_name}")
-    for i, chunk in enumerate(dataset.chunks):
-        print(f"Chunk {i}: ID={chunk.chunk_id}, Text='{chunk.text[:60]}...'")
-    print()
-
-    system.grant_authorization(
-        data_owner_id=owner.user_id,
-        re_id=retrieval_engine.re_id,
-        dataset_id=dataset.dataset_id,
-    )
-    print(f"Authorization granted to {retrieval_engine.name} for dataset '{dataset.document_name}'")
-    print(f"is authorized: {system.ledger.is_authorized(retrieval_engine.re_id, dataset.dataset_id)}")
-    print("=== LEDGER ENTRIES ===")
-    system.ledger.print_entries()
-
-
-    print()
-    print("=== RETRIEVAL ENGINE STARTED ===")
-    print()
-
-
-    system.giveEmbeddings(
-        owner_id=owner.user_id,
-        dataset_id=dataset.dataset_id,
-        re_id=retrieval_engine.re_id,
-    )
-    #print(f"Embeddings given to {retrieval_engine.name} for dataset '{dataset.document_name}'")
-    #print(f"Retrieval Engine Embeddings: {retrieval_engine.embeddings}")
-
-
-
-    query="What is Retrieval-Augmented Generation?"
-    results = system.query(
-        re_id=retrieval_engine.re_id,
-        dataset_id=dataset.dataset_id,
-        query_text=query,
-        k=2,
-    )
-
-    print(f"Query: {query}")
-    print("Results:")
-    for i, (chunk_id, score, plaintext) in enumerate(results):
-        print(f"[{i}] chunk_id={chunk_id} | score={score:.4f} | text='{plaintext[:60]}...'")
-
+    for cli in clients_order:
+        p = open_in_new_terminal(cli, MODULES[cli])
+        processes.append(p)
+        time.sleep(0.5)
+    """
+    try:
+        print("All servers and clients started in separate terminals.")
+        print("Press Ctrl+C here to exit this launcher (other terminals stay open).")
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("Launcher exiting. Child terminals will stay open.")
 
 
 if __name__ == "__main__":

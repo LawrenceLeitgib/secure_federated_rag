@@ -44,11 +44,15 @@ class LedgerTCPServer:
         action = request.get("action")
         payload = request.get("payload", {})
 
+        print(f"LedgerTCPServer received request: {action}")
+        #print(f"Payload: {payload}")
+
+        #print(action=="add_entry")
+
         try:
             if action == "add_entry":
                 # Expect the client to send a SignedLedgerEntry serialized as dict
-                entry_dict = payload["entry"]
-                entry = SignedLedgerEntry.from_dict(entry_dict)
+                entry = SignedLedgerEntry.from_dict(payload)
                 self.ledger.add_entry(entry)
                 return {"status": "ok"}
 

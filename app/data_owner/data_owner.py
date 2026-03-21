@@ -112,6 +112,7 @@ class DataOwner:
         *(self.storage_client.upload_chunk_async(enc_chunk) for enc_chunk in encrypted_chunks),
          return_exceptions=True,
         )
+        print(f"Finished uploading chunks to storage. Results: {results}")
 
 
         dataset = Dataset(
@@ -126,8 +127,9 @@ class DataOwner:
         print()
 
 
-        signedLedgerEntry= register_dataset(dataset,self.user_id ,self.private_key)
-        await self.blockchain_client.add_record(signedLedgerEntry)
+        signedLedgerEntry= register_dataset(dataset.dataset_id,self.user_id ,self.private_key)
+        r=await self.blockchain_client.add_record(signedLedgerEntry)
+        print(f"Registered dataset on blockchain with result: {r}")
         share1, share2 = split_key_dummy(kek)
         await self.custodian_client.store_share(merkle_root, share1)
         #await self.custodian_client.store_share(merkle_root, share2)

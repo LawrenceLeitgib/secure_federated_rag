@@ -12,9 +12,11 @@ class SimpleLedger:
         self.entries: list[SignedLedgerEntry] = []
 
     def add_entry(self, SignedLedgerEntry: SignedLedgerEntry) -> None:
+        print(f"Adding ledger entry: {SignedLedgerEntry.entry_type} with payload: {SignedLedgerEntry.payload}")
         self.entries.append(SignedLedgerEntry)
 
     def is_authorized(self, user_id: str, dataset_id: str) -> bool:
+        print(f"Checking authorization for user: {user_id}, dataset: {dataset_id}")
         for entry in self.entries:
             if entry.entry_type == LedgerEntryType.GRANT_AUTHORIZATION:
                 payload: GrantAuthorizationPayload = entry.payload
