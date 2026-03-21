@@ -16,9 +16,8 @@ class Custodian:
 
 
 def split_key_dummy(key: bytes) -> tuple[bytes, bytes]:
-    midpoint = len(key) // 2
-    return key[:midpoint], key[midpoint:]
+    return key,key
 
 
 def reconstruct_key_dummy(share1: bytes, share2: bytes) -> bytes:
-    return share1 + share2
+    return share1

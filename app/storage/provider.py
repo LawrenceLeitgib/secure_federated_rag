@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.data.chunking import EncryptedChunk
+from app.common.chunking import EncryptedChunk
 
 
 class LocalStorageProvider:
