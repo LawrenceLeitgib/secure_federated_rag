@@ -23,6 +23,7 @@ def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chun
             Chunk(
                 chunk_id=sha256_text(chunk_text_value),
                 text=chunk_text_value,
+                dataset_id="",  # to be filled in later when creating the Dataset
             )
         )
 
@@ -37,12 +38,14 @@ def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chun
 
 @dataclass
 class Chunk:
+    dataset_id: str
     chunk_id: str
     text: str
     embedding: list[float] | None = None
 
 @dataclass
 class EncryptedChunk:
+    dataset_id: str
     chunk_id: str
     encrypted_data: bytes
     encrypted_dek: bytes

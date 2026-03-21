@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from app.domain.models import QueryResult
+
+from app.common.ledger_interaction import QueryResult
 
 
 class SimpleVectorIndex:
@@ -12,6 +13,10 @@ class SimpleVectorIndex:
     def add(self, chunk_id: str, embedding: list[float], text: str) -> None:
         self.vectors[chunk_id] = embedding
         self.texts[chunk_id] = text
+
+    def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
+        for chunk_id, embedding in chunk_embeddings:
+            self.vectors[chunk_id] = embedding
 
     def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))
@@ -37,3 +42,4 @@ class SimpleVectorIndex:
 
         scored.sort(key=lambda x: x.score, reverse=True)
         return scored[:k]
+    

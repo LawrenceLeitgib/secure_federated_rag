@@ -1,10 +1,13 @@
+import asyncio
 from dataclasses import dataclass, field
 import hashlib
 
+from app.common.clients.blockchain_client import BlockchainClient
+from app.common.clients.custodian_client import CustodianClient
 from app.common.crypto.signing import generate_key_pairs
-from app.common.crypto.symmetric import decrypt_bytes
-from app.custodians.custodian import reconstruct_key_dummy
+from app.common.ledger_interaction import register_user
 from app.retrieval.embeddings import embed_text_dummy
+from app.retrieval.vector_index import SimpleVectorIndex
 
 
 @dataclass
@@ -13,28 +16,32 @@ class RetrievalEngine:
     re_id: str
     private_key: bytes
     public_key: bytes
-    embeddings: dict[str, list[float]] = field(default_factory=dict)
+    embeddings: SimpleVectorIndex = field(default_factory=SimpleVectorIndex)
+    custodian_client: CustodianClient = field(default=None)
+    blockchain_client: BlockchainClient = field(default=None)
 
-  
     @classmethod
-    def create(cls, name: str) -> 'RetrievalEngine':
+    async def create(cls, name: str, custodian_client: CustodianClient, blockchain_client: BlockchainClient) -> 'RetrievalEngine':
         private_key, public_key = generate_key_pairs()
         re_id = hashlib.sha256(public_key).hexdigest()
-        ledger.register_user(retrieval_engine.re_id, retrieval_engine.public_key.decode("utf-8"), retrieval_engine.private_key)
+        sign_entry = register_user(re_id, public_key.decode("utf-8"), private_key)
+        await blockchain_client.add_record(sign_entry)  
+
+
 
         return cls(
             name=name,
             re_id=re_id,
             private_key=private_key,
             public_key=public_key,
+            embeddings=SimpleVectorIndex(),
+            custodian_client=custodian_client,
+            blockchain_client=blockchain_client,
         )
     
-    def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
-        for chunk_id, embedding in chunk_embeddings:
-            self.embeddings[chunk_id] = embedding
     
     
-
+    """
     def query(self, query_text: str, k: int = 3) -> list[tuple[str, float]]:
         query_embedding = embed_text_dummy(query_text)
         scored: list[tuple[str, float]] = []
@@ -51,26 +58,29 @@ class RetrievalEngine:
         if norm_a == 0 or norm_b == 0:
             return 0.0
         return dot / (norm_a * norm_b)
-    
-    def query(self, re_id: str, dataset_id: str, query_text: str, k: int = 3) -> list[tuple[str, float, str]]:
-        if not self.ledger.is_authorized(re_id, dataset_id):
-            raise PermissionError(f"User {re_id} is not authorized for dataset {dataset_id}")
+    """
 
-      
-        results = self.retrieval_engines[re_id].query(query_text, k=k)
+    async def query(self, query_text: str, k: int = 3) -> list[tuple[str, float, str]]:
 
-        share1 = self.custodian_a.get_share(dataset_id)
-        share2 = self.custodian_b.get_share(dataset_id)
-        kek = reconstruct_key_dummy(share1, share2)
+        queryResults = self.embeddings.search(embed_text_dummy(query_text), k=k)
 
+       
+       
         decrypted_results: list[tuple[str, float, str]] = []
 
-        for result in results:
-            encrypted_chunk = self.storage.get_chunk(result[0])
-            dek = decrypt_bytes(encrypted_chunk.encrypted_dek, kek).decode("utf-8")
-            plaintext = decrypt_bytes(encrypted_chunk.encrypted_data, dek).decode("utf-8")
+        for queryResult in queryResults:
+            raw=await self.custodian_client.get_plain_text_chunk(self.re_id, queryResult.chunk_id) #TODO make it more async and handle errors properly
+            if(raw.get("status") != "ok"):
+                raise RuntimeError(f"Failed to retrieve chunk {queryResult.chunk_id} from custodian")
+            
+            chunk = raw.get("result").get("chunk")
+            text=chunk.get("text")
+            dataset_id=chunk.get("dataset_id")
+
+            
+           
             decrypted_results.append(
-                (result[0], result[1], plaintext)
+                (queryResult.chunk_id, queryResult.score, text)
             )
 
         return decrypted_results

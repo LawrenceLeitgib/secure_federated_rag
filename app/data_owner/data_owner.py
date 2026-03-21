@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 import hashlib
 from typing import List, Optional
@@ -35,7 +36,7 @@ class DataOwner:
 
     #add a constructor that that a name and return a dataOwner with a generated key pair and a user_id that is the sha256 hash of the public key
     @classmethod
-    def create(
+    async def create(
         cls,
         name: str,
         storage_client: StorageClient,
@@ -47,7 +48,7 @@ class DataOwner:
         private_key, public_key = generate_key_pairs()
         user_id = hashlib.sha256(public_key).hexdigest()
         sign_entry = register_user(user_id, public_key.decode("utf-8"), private_key)
-        blockchain_client.add_record(sign_entry)
+        await blockchain_client.add_record(sign_entry)
         return cls(
             user_id=user_id,
             name=name,
@@ -60,7 +61,7 @@ class DataOwner:
     )
 
     
-    def upload_document(
+    async def upload_document(
         self,
         document_name: str,
         text: str,
@@ -88,28 +89,48 @@ class DataOwner:
             encrypted_dek = encrypt_bytes(dek,kek)
 
             encrypted_chunk = EncryptedChunk(
+                dataset_id="", # we can fill this in later with the merkle root
                 chunk_id=chunk.chunk_id,
                 encrypted_data=encrypted_chunk,
                 encrypted_dek=encrypted_dek
+
             )
             encrypted_chunks.append(encrypted_chunk)
 
-            self.storage_client.upload_chunk(encrypted_chunk )
 
         merkle_root = build_merkle_root(leaf_hashes)
+
+        for chunk in chunks:
+            chunk.dataset_id = merkle_root
+        
+        #update the dataset_id in encrypted_chunks to be the merkle root
+        for enc_chunk in encrypted_chunks:
+            enc_chunk.dataset_id = merkle_root
+            
+        
+        results = await asyncio.gather(
+        *(self.storage_client.upload_chunk_async(enc_chunk) for enc_chunk in encrypted_chunks),
+         return_exceptions=True,
+        )
+
+
         dataset = Dataset(
             dataset_id=merkle_root,
             owner_id=self.user_id,
             document_name=document_name,
             chunks=chunks,
         )
+        print(f"Dataset {dataset.dataset_id} created with Merkle root {merkle_root} and {len(chunks)} chunks")
+        print(f"the chunk IDs are: {'\n '.join(chunk.chunk_id for chunk in chunks)}")
+        print()
+        print()
 
 
         signedLedgerEntry= register_dataset(dataset,self.user_id ,self.private_key)
-        self.blockchain_client.add_record(signedLedgerEntry)
+        await self.blockchain_client.add_record(signedLedgerEntry)
         share1, share2 = split_key_dummy(kek)
-        self.custodian_client.store_share(merkle_root, share1)
-        self.custodian_client.store_share(merkle_root, share2)
+        await self.custodian_client.store_share(merkle_root, share1)
+        #await self.custodian_client.store_share(merkle_root, share2)
 
         self.dataset_list.append(dataset)
         return dataset

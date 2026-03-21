@@ -1,4 +1,5 @@
 # app/data_owner/client.py
+import asyncio
 import sys
 
 from app.data_owner.service import DataOwnerService
@@ -11,7 +12,7 @@ def prompt(msg: str) -> str:
         return ""
 
 
-def main() -> None:
+async def main() -> None:
     service = DataOwnerService()
 
     # Step 1: create or load an owner
@@ -20,11 +21,11 @@ def main() -> None:
         print("Name is required. Exiting.")
         sys.exit(1)
 
-    owner_info = service.create_owner(name)
+    owner_info = await service.create_owner(name)
     print(f"Created data owner:")
     print(f"  user_id   : {owner_info['user_id']}")
     print(f"  name      : {owner_info['name']}")
-    print(f"  public_key: {owner_info['public_key'][:30]}...")
+    print(f"  public_key: {owner_info['public_key'][:50]}...")
 
     # Step 2: interactive loop
     while True:
@@ -47,7 +48,7 @@ def main() -> None:
                 lines.append(line)
             text = "\n".join(lines)
 
-            dataset = service.upload_text_document(
+            dataset = await service.upload_text_document(
                 document_name=document_name,
                 text=text,
             )
@@ -67,7 +68,7 @@ def main() -> None:
             print("Owner info:")
             print(f"  user_id   : {info['user_id']}")
             print(f"  name      : {info['name']}")
-            print(f"  public_key: {info['public_key'][:30]}...")
+            print(f"  public_key: {info['public_key'][:50]}...")
 
         elif choice == "4" or choice.lower() in ("q", "quit", "exit"):
             print("Bye!")
@@ -76,4 +77,4 @@ def main() -> None:
             print("Unknown choice.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

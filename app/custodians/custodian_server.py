@@ -39,7 +39,7 @@ class CustodianTCPServer:
             writer.close()
             await writer.wait_closed()
 
-    def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
+    async def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
         action = request.get("action")
         payload = request.get("payload", {})
 
@@ -69,18 +69,26 @@ class CustodianTCPServer:
             
             elif action == "get_plain_text_chunk":
                 chunk_id: str = payload["chunk_id"]
+                user_id: str = payload["user_id"]
 
-                chunk,authorised = self.service.get_plain_text_chunk(chunk_id)
+                chunk,authorised = await self.service.get_plain_text_chunk(user_id,chunk_id)
                 if not authorised:
                     return {"status": "ok", "result": {"found": False, "authorized": False}}
                 if chunk is None:
                     return {"status": "ok", "result": {"found": False, "authorized": True}}
+                
+                chunk_dict = {
+                    "dataset_id": chunk.dataset_id,
+                    "chunk_id": chunk.chunk_id,
+                    "text": chunk.text,  
+                }
+
                 return {
                     "status": "ok",
                     "result": {
                         "found": True,
-                        "chunk": chunk.hex(),
-                        "authorized": True
+                        "authorized": True,
+                        "chunk": chunk_dict,
                     },
                 }
 
@@ -101,7 +109,7 @@ async def main() -> None:
     server = await asyncio.start_server(
         server_obj.handle_client,
         "127.0.0.1",
-        5003,
+        9001,
     )
 
     addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])

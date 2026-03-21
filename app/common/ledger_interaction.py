@@ -1,4 +1,5 @@
 from __future__ import annotations
+import base64
 from enum import Enum
 from typing import Union
 from dataclasses import asdict, dataclass
@@ -48,7 +49,10 @@ def add_authorization_entry(dataOwner_id: str, dataset_id: str, re_id: str, priv
 
 
 
-
+class LedgerEntryType(Enum):
+    REGISTER_USER = "register_user"
+    REGISTER_DATASET = "register_dataset"
+    GRANT_AUTHORIZATION = "grant_authorization"
 
 @dataclass
 class RegisterUser:
@@ -134,12 +138,14 @@ class SignedLedgerEntry:
 def sign_ledger_entry(entry: LedgerEntry, private_key: bytes,password: Optional[bytes] = None) -> SignedLedgerEntry:
     message = entry.to_canonical_bytes()
     signature = sign_data( private_key,message, password=password)
+    #make the signature a string for easier transmission
+    signature = base64.b64encode(signature).decode('utf-8')
     
 
     return SignedLedgerEntry(
         entry_type=entry.entry_type,
         payload=entry.payload,
-        signature=signature,
+        signature=signature
     )
 
 
@@ -157,16 +163,9 @@ def verify_signed_ledger_entry(
 
 
 
-@dataclass
-class LedgerEntry:
-    entry_type: str
-    payload: dict
 
 
-class LedgerEntryType(Enum):
-    REGISTER_USER = "register_user"
-    REGISTER_DATASET = "register_dataset"
-    GRANT_AUTHORIZATION = "grant_authorization"
+
 
 
 @dataclass

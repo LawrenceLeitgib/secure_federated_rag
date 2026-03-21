@@ -35,6 +35,8 @@ class StorageClient:
             writer.close()
             await writer.wait_closed()
 
+    
+
     async def retrieve_chunk_async(self, chunk_id: str) -> dict[str, Any]:
         reader, writer = await asyncio.open_connection(self.host, self.port)
         try:

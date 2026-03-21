@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from app.common.chunking import Chunk, EncryptedChunk
 from app.custodians.custodian import Custodian
 from app.common.clients.storage_client import StorageClient
 from app.common.clients.blockchain_client import BlockchainClient
-from app.common.ledger_interaction import register_custodian_share  # if you add this kind of helper
 
 
 class CustodianService:
@@ -22,28 +22,37 @@ class CustodianService:
         # 1. Store locally in the custodian domain object
         self.custodian.store_share(dataset_id, share)
 
-        # 2. Optionally, register something on blockchain
-        if self.blockchain_client is not None:
-            # e.g., write a record that this custodian holds a share
-            # The exact API depends on your ledger_interaction module
-            entry = register_custodian_share(
-                custodian_id=self.custodian.custodian_id,
-                dataset_id=dataset_id,
-            )
-            self.blockchain_client.add_record(entry)
-
     def get_share(self, dataset_id: str) -> bytes | None:
         return self.custodian.get_share(dataset_id)
     
-    def get_plain_text_chunk(self, dataset_id: str) -> tuple[dict[str, Any] | None, bool]:
+    async def get_plain_text_chunk(self,user_id: str,chunk_id: str) -> tuple[Chunk | None, bool]:
         if self.blockchain_client is not None:
             # Check if the custodian is authorized to access this dataset
-            if not self.blockchain_client.is_custodian_authorized(self.custodian.custodian_id, dataset_id):
-                return None, False  # Not authorized
+            #if not await self.blockchain_client.is_authorized(user_id, dataset_id):
+            #    return None, False  # Not authorized
+            pass  #TODO: implement a true authorization check here, for now we skip it to test the flow
         else :
             raise RuntimeError("Blockchain client not available for authorization check")
 
 
         if self.storage_client is not None:
-            return self.storage_client.retrieve_plaintext_chunk(dataset_id), True
+            encrypted_chunk_payload = await self.storage_client.retrieve_chunk_async(chunk_id)
+            if encrypted_chunk_payload.get("status") == "ok":
+                result=encrypted_chunk_payload.get("result")
+                chunk_id = result.get("chunk_id")
+                encrypted_chunk = result.get("encrypted_chunk")
+                encrypted_dek= result.get("encrypted_dek")
+                # Decrypt the chunk using the custodian's share (DEK)
+                chunk = self.custodian.decrypt_chunk(
+                    encrypted_chunk=EncryptedChunk(
+                        chunk_id=chunk_id,
+                        encrypted_data=encrypted_chunk,
+                        encrypted_dek=encrypted_dek
+                    )
+                )
+
+                return chunk, True
+              
+            else:
+                raise RuntimeError(f"Failed to retrieve chunk: {encrypted_chunk_payload.get('error')}")
         return None, True

@@ -18,7 +18,8 @@ class BlockchainClient:
         reader, writer = await asyncio.open_connection(self.host, self.port)
         try:
             payload= signed_ledger_entry.to_dict()
-            request = {"action": "add_record", "payload": payload}
+            print(payload)
+            request = {"action": "add_entry", "payload": payload}
             writer.write(encode_message(request))
             await writer.drain()
 

@@ -6,7 +6,7 @@ from app.common.clients.custodian_client import CustodianClient
 from app.common.clients.retrieval_client import RetrievalClient
 from app.common.clients.storage_client import StorageClient
 from app.common.ledger_interaction import add_authorization_entry, register_user
-from app.data_owner.dataOwner import DataOwner
+from app.data_owner.data_owner import DataOwner
 # plus imports for storage, blockchain, custodian, retrieval if you move them out
 
 
@@ -18,8 +18,8 @@ class DataOwnerService:
         self.blockchain_client = BlockchainClient()
         self.retrieval_client = RetrievalClient()
         
-    def create_owner(self, name: str) -> dict:
-        self.owner = DataOwner.create(name, self.storage_client, self.blockchain_client, self.custodian_client, self.retrieval_client)
+    async def create_owner(self, name: str) -> dict:
+        self.owner = await DataOwner.create(name, self.storage_client, self.blockchain_client, self.custodian_client, self.retrieval_client)
         return {
             "user_id": self.owner.user_id,
             "name": self.owner.name,
@@ -39,7 +39,7 @@ class DataOwnerService:
             "public_key": owner.public_key.decode("utf-8"),
         }
 
-    def upload_text_document(
+    async def upload_text_document(
         self,
         document_name: str,
         text: str,
@@ -54,7 +54,7 @@ class DataOwnerService:
         # - calling LocalStorageProvider
         # - calling custodians
         # - computing Merkle root
-        dataset = owner.upload_document(
+        dataset = await owner.upload_document(
             document_name=document_name,
             text=text,
             chunk_size=chunk_size,

@@ -36,3 +36,26 @@ class RetrievalClient:
         finally:
             writer.close()
             await writer.wait_closed()
+
+    async def query(self, user_id: str, query_text: str) -> dict[str, Any]:
+        """Send a query to the retrieval engine and return the response."""
+
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            payload = {
+                "user_id": user_id,
+                "query_text": query_text,
+            }
+            request = {"action": "query", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Retrieval server closed connection")
+
+            response = decode_message(line)
+            return response
+        finally:
+            writer.close()
+            await writer.wait_closed()

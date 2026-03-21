@@ -66,6 +66,7 @@ class StorageTCPServer:
                 return {
                     "status": "ok",
                     "result": {
+                        "dataset_id": encrypted_chunk.dataset_id,
                         "chunk_id": encrypted_chunk.chunk_id,
                         "encrypted_data": encrypted_chunk.encrypted_data.hex(),
                         "encrypted_dek": encrypted_chunk.encrypted_dek.hex(),

@@ -33,3 +33,24 @@ class CustodianClient:
         finally:
             writer.close()
             await writer.wait_closed()
+
+    async def get_plain_text_chunk(self, user_id: str, chunk_id: str) -> dict[str, Any]:
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            payload = {
+                "user_id": user_id,
+                "chunk_id": chunk_id
+            }
+            request = {"action": "get_plain_text_chunk", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Custodian server closed connection")
+
+            response = decode_message(line)
+            return response
+        finally:
+            writer.close()
+            await writer.wait_closed()
