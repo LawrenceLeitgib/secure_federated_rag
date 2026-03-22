@@ -13,11 +13,12 @@ class CustodianClient:
         self.host = host
         self.port = port
 
-    async def store_share(self, user_id: str, encrypted_private_key: bytes) -> dict[str, Any]:
+    async def store_share(self, user_id: str, dataset_id: str, encrypted_private_key: bytes) -> dict[str, Any]:
         reader, writer = await asyncio.open_connection(self.host, self.port)
         try:
             payload = {
                 "user_id": user_id,
+                "dataset_id": dataset_id,
                 "encrypted_private_key": encrypted_private_key.hex(),
             }
             request = {"action": "store_share", "payload": payload}

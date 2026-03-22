@@ -42,24 +42,35 @@ class RetrievalEngineTCPServer:
     async def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
         action = request.get("action")
         payload = request.get("payload", {})
+        print(f"RetrievalEngineTCPServer received request: {action}")
 
         try:
             if action == "query":
                 user_id: str = payload["user_id"]
                 query_text: str = payload["query_text"]
 
-                results = await self.service.query(
+                rag_results = await self.service.answer_query(
                     query_text=query_text,
                     k=3,
                 )
-
+                print(f"RetrievalEngineTCPServer returning final answer for query: {query_text}")
                 return {
                     "status": "ok",
-                    "result": {
-                        "count": len(results),
-                        "results": results,
-                    },
+                    "result":rag_results,
                 }
+            if action == "add_embeddings":
+                user_id: str = payload["user_id"]
+                embeddings = payload["embeddings"]  # list of dicts with chunk_id and embedding
+
+                # Convert to list of tuples for the service method
+                chunk_embeddings = [
+                    (item["chunk_id"], item["embedding"])
+                    for item in embeddings
+                ]
+                print(f"RetrievalEngineTCPServer received {len(chunk_embeddings)} chunk embeddings for user: {user_id}")
+
+                await self.service.add_embeddings(chunk_embeddings)
+                return {"status": "ok"}
 
             elif action == "ping":
                 return {"status": "ok", "result": "pong"}

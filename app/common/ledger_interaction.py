@@ -160,17 +160,3 @@ def verify_signed_ledger_entry(
     message = unsigned_entry.to_canonical_bytes()
     return  verify_signature(public_key, message, signed_entry.signature)
 
-
-
-
-
-
-
-
-
-@dataclass
-class QueryResult:
-    chunk_id: str
-    score: float
-    text: str
-

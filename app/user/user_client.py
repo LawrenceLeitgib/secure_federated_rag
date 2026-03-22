@@ -33,6 +33,7 @@ class SimpleTerminalUser:
 
         try:
             response = await self.client.query(self.user_id, query_text)
+            print(f"Received response from retrieval engine: {response}")
         except Exception as e:
             print(f"Error while querying retrieval engine: {e}")
             return
@@ -64,7 +65,8 @@ class SimpleTerminalUser:
 
 async def _main() -> None:
     user = SimpleTerminalUser()
-    await user.run_once()
+    while True:
+        await user.run_once()
 
 
 if __name__ == "__main__":

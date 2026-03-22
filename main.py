@@ -40,8 +40,8 @@ def main() -> None:
         processes.append(p)
         time.sleep(1.0)
 
-    time.sleep(3.0)
-    """
+    time.sleep(1.5)
+    
     clients_order = [
         "data_owner_client",
         "user_client",
@@ -51,7 +51,7 @@ def main() -> None:
         p = open_in_new_terminal(cli, MODULES[cli])
         processes.append(p)
         time.sleep(0.5)
-    """
+    
     try:
         print("All servers and clients started in separate terminals.")
         print("Press Ctrl+C here to exit this launcher (other terminals stay open).")

@@ -46,12 +46,13 @@ class CustodianTCPServer:
         print(f"CustodianTCPServer received request: {action}")
         try:
             if action == "store_share":
+                user_id: str = payload["user_id"]
                 dataset_id: str = payload["dataset_id"]
-                share_hex: str = payload["share"]
+                share_hex: str = payload["encrypted_private_key"]
                 share = bytes.fromhex(share_hex)
 
                 # Delegate to service
-                self.service.store_share(dataset_id, share)
+                await self.service.store_share(user_id, dataset_id, share)
                 return {"status": "ok"}
 
             elif action == "get_share":

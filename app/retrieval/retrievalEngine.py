@@ -8,7 +8,7 @@ from app.common.crypto.signing import generate_key_pairs
 from app.common.ledger_interaction import register_user
 from app.retrieval.embeddings import embed_text_dummy
 from app.retrieval.vector_index import SimpleVectorIndex
-
+from app.retrieval.llm import QwenLLM
 
 @dataclass
 class RetrievalEngine:
@@ -19,6 +19,7 @@ class RetrievalEngine:
     embeddings: SimpleVectorIndex = field(default_factory=SimpleVectorIndex)
     custodian_client: CustodianClient = field(default=None)
     blockchain_client: BlockchainClient = field(default=None)
+    llm: QwenLLM = field(default_factory=QwenLLM)
 
     @classmethod
     async def create(cls, name: str, custodian_client: CustodianClient, blockchain_client: BlockchainClient) -> 'RetrievalEngine':
@@ -26,6 +27,7 @@ class RetrievalEngine:
         re_id = hashlib.sha256(public_key).hexdigest()
         sign_entry = register_user(re_id, public_key.decode("utf-8"), private_key)
         await blockchain_client.add_record(sign_entry)  
+        print(f"Registered retrieval engine on blockchain with id: {re_id}")
 
 
 
@@ -37,6 +39,7 @@ class RetrievalEngine:
             embeddings=SimpleVectorIndex(),
             custodian_client=custodian_client,
             blockchain_client=blockchain_client,
+            llm=QwenLLM()
         )
     
     
@@ -64,14 +67,17 @@ class RetrievalEngine:
 
         queryResults = self.embeddings.search(embed_text_dummy(query_text), k=k)
 
+        print(f"RetrievalEngine found {len(queryResults)} results for query: {query_text}")
+
        
        
         decrypted_results: list[tuple[str, float, str]] = []
 
-        for queryResult in queryResults:
-            raw=await self.custodian_client.get_plain_text_chunk(self.re_id, queryResult.chunk_id) #TODO make it more async and handle errors properly
+        for chunk_id, score in queryResults:
+            raw=await self.custodian_client.get_plain_text_chunk(self.re_id, chunk_id) #TODO make it more async and handle errors properly
+            print(f"RetrievalEngine received raw chunk data from custodian for chunk_id: {chunk_id}, response: {raw}")
             if(raw.get("status") != "ok"):
-                raise RuntimeError(f"Failed to retrieve chunk {queryResult.chunk_id} from custodian")
+                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian")
             
             chunk = raw.get("result").get("chunk")
             text=chunk.get("text")
@@ -80,7 +86,36 @@ class RetrievalEngine:
             
            
             decrypted_results.append(
-                (queryResult.chunk_id, queryResult.score, text)
+                (chunk_id, score, text)
             )
 
         return decrypted_results
+    
+
+    async def answer_query(self, query_text: str, k: int = 3) -> dict:
+        retrieved = await self.query(query_text=query_text, k=k)
+        for chunk_id, score, text in retrieved:
+            print(f"Retrieved chunk for RAG: chunk_id={chunk_id}, score={score}, text={text[:50]}...")
+
+        contexts = [text for _, _, text in retrieved]
+        llm_response = self.llm.generate_answer(
+            query=query_text,
+            contexts=contexts,
+        )
+
+        return {
+            "query": query_text,
+            "answer": llm_response.answer,
+            "retrieved_chunks": [
+                {
+                    "chunk_id": chunk_id,
+                    "score": score,
+                    "text": text,
+                }
+                for chunk_id, score, text in retrieved
+            ],
+            "usage": {
+                "prompt_tokens": llm_response.prompt_tokens,
+                "generated_tokens": llm_response.generated_tokens,
+            },
+        }

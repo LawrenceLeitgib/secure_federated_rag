@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from numpy import byte
+
 from app.common.chunking import Chunk, EncryptedChunk
 from app.custodians.custodian import Custodian
 from app.common.clients.storage_client import StorageClient
@@ -18,8 +20,10 @@ class CustodianService:
         self.storage_client =   StorageClient()       # storage server
         self.blockchain_client = BlockchainClient() # ledger server
 
-    async def store_share(self, dataset_id: str, share: bytes) -> None:
-        print(f"Storing share for dataset: {dataset_id}")
+    async def store_share(self, user_id: str, dataset_id: str, share: bytes) -> None:
+        #TODO: in the future, check the blockain to verify that the user_id own the dataset.
+
+        print(f"Storing share for dataset: {dataset_id}, user: {user_id}, share: {share}")
         # 1. Store locally in the custodian domain object
         self.custodian.store_share(dataset_id, share)
 
@@ -42,18 +46,19 @@ class CustodianService:
             encrypted_chunk_payload = await self.storage_client.retrieve_chunk_async(chunk_id)
             if encrypted_chunk_payload.get("status") == "ok":
                 result=encrypted_chunk_payload.get("result")
+                dataset_id = result.get("dataset_id")
                 chunk_id = result.get("chunk_id")
-                encrypted_chunk = result.get("encrypted_chunk")
+                encrypted_chunk = result.get("encrypted_data")
                 encrypted_dek= result.get("encrypted_dek")
                 # Decrypt the chunk using the custodian's share (DEK)
                 chunk = self.custodian.decrypt_chunk(
                     encrypted_chunk=EncryptedChunk(
+                        dataset_id=dataset_id,
                         chunk_id=chunk_id,
-                        encrypted_data=encrypted_chunk,
-                        encrypted_dek=encrypted_dek
+                        encrypted_data= bytes.fromhex(encrypted_chunk),
+                        encrypted_dek=bytes.fromhex(encrypted_dek)   
                     )
                 )
-
                 return chunk, True
               
             else:

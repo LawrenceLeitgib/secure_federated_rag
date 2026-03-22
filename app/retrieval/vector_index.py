@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 
-from app.common.ledger_interaction import QueryResult
 
 
 class SimpleVectorIndex:
@@ -10,11 +9,9 @@ class SimpleVectorIndex:
         self.vectors: dict[str, list[float]] = {}
         self.texts: dict[str, str] = {}
 
-    def add(self, chunk_id: str, embedding: list[float], text: str) -> None:
-        self.vectors[chunk_id] = embedding
-        self.texts[chunk_id] = text
 
-    def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
+
+    async def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
         for chunk_id, embedding in chunk_embeddings:
             self.vectors[chunk_id] = embedding
 
@@ -27,19 +24,15 @@ class SimpleVectorIndex:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    def search(self, query_embedding: list[float], k: int = 3) -> list[QueryResult]:
-        scored: list[QueryResult] = []
+    def search(self, query_embedding: list[float], k: int = 3) -> list[tuple[str, float]]:
+        scored: list[tuple[str, float]] = []
 
         for chunk_id, emb in self.vectors.items():
             score = self._cosine_similarity(query_embedding, emb)
             scored.append(
-                QueryResult(
-                    chunk_id=chunk_id,
-                    score=score,
-                    text=self.texts[chunk_id],
-                )
+                (chunk_id, score)
             )
 
-        scored.sort(key=lambda x: x.score, reverse=True)
+        scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:k]
     

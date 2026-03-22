@@ -68,17 +68,22 @@ class DataOwnerService:
             "num_chunks": len(dataset.chunks),
         }
     
-    def give_embeddings(self, dataset_id: str, re_id: str) -> None:
+    async def give_embeddings(self, dataset_id: str, re_id: str) -> None:
         owner = self._require_owner()
-        self.retrieval_client.add_embeddings(re_id, dataset_id, owner.get_embeddings(dataset_id))
+        await self.retrieval_client.add_embeddings(re_id, owner.get_embeddings(dataset_id))
 
-    def grant_authorization(self, dataset_id: str, re_id: str) -> None:
+    async def grant_authorization(self, dataset_id: str, re_id: str) -> None:
         owner = self._require_owner()
-        self.blockchain_client.add_record(add_authorization_entry(
+        await self.blockchain_client.add_record(add_authorization_entry(
             dataOwner_id=owner.user_id,
             dataset_id=dataset_id,
             re_id=re_id,
             private_key=owner.private_key,) )
+        
+    async def give_access(self, dataset_id: str, re_id: str) -> None:
+        await self.grant_authorization(dataset_id, re_id)
+        await self.give_embeddings(dataset_id, re_id)
+
 
     def list_datasets(self) -> list[dict]:
         owner = self._require_owner()

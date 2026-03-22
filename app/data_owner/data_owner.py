@@ -131,8 +131,9 @@ class DataOwner:
         r=await self.blockchain_client.add_record(signedLedgerEntry)
         print(f"Registered dataset on blockchain with result: {r}")
         share1, share2 = split_key_dummy(kek)
-        await self.custodian_client.store_share(merkle_root, share1)
-        #await self.custodian_client.store_share(merkle_root, share2)
+        await self.custodian_client.store_share(self.user_id, merkle_root, share1)
+        print(f"Stored share for dataset: {merkle_root}, user: {self.user_id}, share: {share1}")
+        #await self.custodian_client.store_share(self.user_id, merkle_root, share2)
 
         self.dataset_list.append(dataset)
         return dataset

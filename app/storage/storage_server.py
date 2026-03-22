@@ -64,7 +64,9 @@ class StorageTCPServer:
          
             elif action == "get_chunk":
                 chunk_id: str = payload["chunk_id"]
+                print(f"Requesting chunk from storage for chunk_id: {chunk_id}")
                 encrypted_chunk = self.storage.get_chunk(chunk_id)
+                print(f"Retrieved chunk from storage: {encrypted_chunk}")
 
                 return {
                     "status": "ok",

@@ -32,16 +32,25 @@ class RetrievalEngineService:
         return cls(engine)
 
     # Simple helper to load / update embeddings
-    def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
-        self.engine.add_embeddings(chunk_embeddings)
+    async def add_embeddings(self, chunk_embeddings: list[tuple[str, list[float]]]) -> None:
+        await self.engine.embeddings.add_embeddings(chunk_embeddings)
+
+    async def answer_query(
+        self,
+        query_text: str,
+        k: int = 3,
+    ) -> dict[str, Any]:
+        print(f"RetrievalEngineService received RAG query: {query_text}")
+        return await self.engine.answer_query(query_text=query_text, k=k)
 
     async def query(
         self,
         query_text: str,
         k: int = 3,
     ) -> list[dict[str, Any]]:
+        print(f"RetrievalEngineService received query: {query_text}")
       
-        results= self.engine.query(query_text=query_text, k=k)
+        results= await self.engine.query(query_text=query_text, k=k)
 
         #make it into a list of dicts with chunk_id, score and text
         decrypted_results = [
