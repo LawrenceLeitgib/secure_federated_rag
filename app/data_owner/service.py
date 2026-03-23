@@ -84,6 +84,11 @@ class DataOwnerService:
         await self.grant_authorization(dataset_id, re_id)
         await self.give_embeddings(dataset_id, re_id)
 
+    async def get_retrieval_engine_id(self) -> str:
+        # For simplicity, we assume there's only one retrieval engine and we can get its id from the retrieval client
+        re_id = await self.retrieval_client.get_re_id()
+        return re_id
+
 
     def list_datasets(self) -> list[dict]:
         owner = self._require_owner()

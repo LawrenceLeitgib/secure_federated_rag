@@ -23,6 +23,7 @@ async def main() -> None:
    
 
     owner_info = await service.create_owner(name)
+
     print(f"Created data owner:")
     print(f"  user_id   : {owner_info['user_id']}")
     print(f"  name      : {owner_info['name']}")
@@ -30,22 +31,7 @@ async def main() -> None:
 
     if(name == "test"):
         #upload a test dataset
-        lines=["Retrieval-Augmented Generation improves question answering by retrieving relevant chunks",
-                     "from a knowledge base. In this prototype, data owners upload documents, which are chunked,",
-                     "hashed into a Merkle tree, encrypted, and stored by an untrusted storage provider.",
-                     "",
-                     "A blockchain-like ledger keeps metadata such as user registration, dataset registration,",
-                     "Merkle root, and authorizations. Custodians hold key shares and only reconstruct the",
-                     "encryption key when the querying user is authorized.",
-                     "",
-                     "The retrieval engine embeds chunks and user queries, then performs similarity search.",
-                     "The most relevant encrypted chunks are fetched, decrypted, and returned as context." ]
-        text = "\n".join(lines)
-        dataset = await service.upload_text_document(
-                document_name="Test Document",
-                text=text,
-            )
-        print(f"Uploaded test dataset with id: {dataset['dataset_id']}")
+        await initialize_for_testing(service)
 
     # Step 2: interactive loop
     while True:
@@ -105,6 +91,57 @@ async def main() -> None:
             break
         else:
             print("Unknown choice.")
+
+async def initialize_for_testing(service):
+    result = await service.get_retrieval_engine_id()
+    status = result.get("status")
+    if status != "ok":
+        print(f"Error while getting retrieval engine id: {result.get('error')}")
+        return
+    re_id = result.get("result")
+
+
+
+    text1="Retrieval-Augmented Generation improves question answering by retrieving relevant chunks     from a knowledge base. In this prototype, data owners upload documents, which are chunked,     hashed into a Merkle tree, encrypted, and stored by an untrusted storage provider.      A blockchain-like ledger keeps metadata such as user registration, dataset registration,     Merkle root, and authorizations. Custodians hold key shares and only reconstruct the     encryption key when the querying user is authorized.      The retrieval engine embeds chunks and user queries, then performs similarity search.     The most relevant encrypted chunks are fetched, decrypted, and returned as context."
+    dataset1 = await service.upload_text_document(
+                document_name="Rag overview",
+                text=text1,
+            )
+    
+    text2 ="A balanced diet is essential for maintaining good health and supporting the body's daily functions. It includes a variety of nutrients such as carbohydrates, proteins, fats, vitamins, and minerals, each playing a specific role.  Carbohydrates are the body's primary source of energy and are found in foods like bread, rice, and fruits. Proteins are crucial for building and repairing tissues, and they are commonly found in meat, fish, eggs, and legumes. Fats, although often misunderstood, are necessary for hormone production and cell structure.  Vitamins and minerals support numerous biological processes. For example, vitamin C helps with immune function, while calcium is important for bone strength. A deficiency in essential nutrients can lead to various health problems.  Hydration is another key component of a healthy diet. Water is involved in digestion, temperature regulation, and the transport of nutrients throughout the body.  Maintaining a balanced diet also involves moderation. Excessive consumption of sugar, salt, or processed foods can increase the risk of chronic diseases such as diabetes and heart disease."
+    dataset2 = await service.upload_text_document(
+                document_name="Balanced Diet",
+                text=text2,
+            )
+    text3= "The Roman Empire was one of the most influential civilizations in history, lasting from 27 BCE to 476 CE in the West. It expanded across Europe, North Africa, and parts of the Middle East, creating a vast and diverse territory.  Roman society was highly structured, with a clear hierarchy that included emperors, senators, citizens, and slaves. The empire was known for its advanced engineering, including roads, aqueducts, and monumental architecture such as the Colosseum.  The Roman legal system laid the foundation for many modern legal principles. Laws were written and applied across the empire, helping maintain order in such a large territory.  Despite its strength, the empire faced numerous challenges, including political instability, economic difficulties, and external invasions by various tribes. These factors contributed to the eventual fall of the Western Roman Empire.  However, the legacy of Rome continues to influence modern language, law, architecture, and governance systems."
+
+    dataset3 = await service.upload_text_document(
+                document_name="Roman Empire",
+                text=text3,
+            )
+    
+    text4=" Memory is the cognitive process that allows humans to store, retain, and recall information. It is essential for learning, decision-making, and daily functioning.  There are different types of memory, including short-term memory and long-term memory. Short-term memory temporarily holds information for immediate use, while long-term memory stores information over extended periods.  Long-term memory can be further divided into explicit and implicit memory. Explicit memory involves conscious recall, such as remembering facts or events, whereas implicit memory includes skills and habits that are performed automatically.  Memory is not a perfect recording of events. It can be influenced by emotions, biases, and external suggestions, leading to distortions or false memories.  The process of memory formation involves encoding, storage, and retrieval. Effective learning strategies, such as repetition and meaningful association, can improve memory retention."
+    dataset4 = await service.upload_text_document(
+                document_name="Memory",
+                text=text4,
+            )
+
+
+    print(f"Uploaded test dataset with id: {dataset1['dataset_id']}")
+    print(f"Uploaded test dataset with id: {dataset2['dataset_id']}")
+    print(f"Uploaded test dataset with id: {dataset3['dataset_id']}")
+    print(f"Uploaded test dataset with id: {dataset4['dataset_id']}")
+
+
+    await service.give_access(dataset_id=dataset1["dataset_id"], re_id=re_id)
+    print(f"Granted access to dataset {dataset1['dataset_id']} for retriever {re_id}")
+    await service.give_access(dataset_id=dataset2["dataset_id"], re_id=re_id)
+    print(f"Granted access to dataset {dataset2['dataset_id']} for retriever {re_id}")
+    await service.give_access(dataset_id=dataset3["dataset_id"], re_id=re_id)
+    print(f"Granted access to dataset {dataset3['dataset_id']} for retriever {re_id}")
+    await service.give_access(dataset_id=dataset4["dataset_id"], re_id=re_id)
+    print(f"Granted access to dataset {dataset4['dataset_id']} for retriever {re_id}")
+
 
 
 

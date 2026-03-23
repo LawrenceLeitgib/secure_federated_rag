@@ -25,17 +25,19 @@ class RetrievalEngineTCPServer:
             while True:
                 line = await reader.readline()
                 if not line:
+                    print("SERVER: EOF from client")
                     break
-
                 request = decode_message(line)
                 response = await self.dispatch(request)
 
                 writer.write(encode_message(response))
                 await writer.drain()
         except Exception as e:
+            print(f"SERVER ERROR: {e!r}")
             writer.write(encode_message({"status": "error", "error": str(e)}))
             await writer.drain()
         finally:
+            print("SERVER: closing client connection")
             writer.close()
             await writer.wait_closed()
 
@@ -71,6 +73,10 @@ class RetrievalEngineTCPServer:
 
                 await self.service.add_embeddings(chunk_embeddings)
                 return {"status": "ok"}
+            
+            if action == "get_re_id":
+                re_id = self.service.engine.re_id
+                return {"status": "ok", "result": re_id}
 
             elif action == "ping":
                 return {"status": "ok", "result": "pong"}
@@ -92,6 +98,7 @@ async def main() -> None:
         server_obj.handle_client,
         "127.0.0.1",
         10001,
+        limit=10 * 1024 * 1024,  # 10 MB
     )
 
     addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])

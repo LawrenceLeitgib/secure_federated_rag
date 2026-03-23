@@ -6,7 +6,7 @@ from app.common.clients.blockchain_client import BlockchainClient
 from app.common.clients.custodian_client import CustodianClient
 from app.common.crypto.signing import generate_key_pairs
 from app.common.ledger_interaction import register_user
-from app.retrieval.embeddings import embed_text_dummy
+from app.retrieval.embeddings import QwenEmbedder
 from app.retrieval.vector_index import SimpleVectorIndex
 from app.retrieval.llm import QwenLLM
 
@@ -20,6 +20,7 @@ class RetrievalEngine:
     custodian_client: CustodianClient = field(default=None)
     blockchain_client: BlockchainClient = field(default=None)
     llm: QwenLLM = field(default_factory=QwenLLM)
+    embedder: QwenEmbedder = field(default_factory=QwenEmbedder)
 
     @classmethod
     async def create(cls, name: str, custodian_client: CustodianClient, blockchain_client: BlockchainClient) -> 'RetrievalEngine':
@@ -39,7 +40,8 @@ class RetrievalEngine:
             embeddings=SimpleVectorIndex(),
             custodian_client=custodian_client,
             blockchain_client=blockchain_client,
-            llm=QwenLLM()
+            llm=QwenLLM(),
+            embedder=QwenEmbedder(),
         )
     
     
@@ -64,8 +66,9 @@ class RetrievalEngine:
     """
 
     async def query(self, query_text: str, k: int = 3) -> list[tuple[str, float, str]]:
+        query_embedding = self.embedder.embed_text(query_text, is_query=True)
 
-        queryResults = self.embeddings.search(embed_text_dummy(query_text), k=k)
+        queryResults = self.embeddings.search(query_embedding, k=k)
 
         print(f"RetrievalEngine found {len(queryResults)} results for query: {query_text}")
 
@@ -75,7 +78,6 @@ class RetrievalEngine:
 
         for chunk_id, score in queryResults:
             raw=await self.custodian_client.get_plain_text_chunk(self.re_id, chunk_id) #TODO make it more async and handle errors properly
-            print(f"RetrievalEngine received raw chunk data from custodian for chunk_id: {chunk_id}, response: {raw}")
             if(raw.get("status") != "ok"):
                 raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian")
             

@@ -15,6 +15,7 @@ class RetrievalClient:
 
     async def add_embeddings(self, user_id: str, embeddings: list[tuple[str, list[float]]]) -> dict[str, Any]:
         reader, writer = await asyncio.open_connection(self.host, self.port)
+        print(f"Connected to retrieval server at {self.host}:{self.port} to add embeddings for user_id: {user_id}")
         try:
             payload = {
                 "user_id": user_id,
@@ -24,6 +25,7 @@ class RetrievalClient:
                 ],
             }
             request = {"action": "add_embeddings", "payload": payload}
+            print(f"CLIENT: sending {len(encode_message(request))} bytes")
             writer.write(encode_message(request))
             await writer.drain()
 
@@ -47,6 +49,23 @@ class RetrievalClient:
                 "query_text": query_text,
             }
             request = {"action": "query", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Retrieval server closed connection")
+
+            response = decode_message(line)
+            return response
+        finally:
+            writer.close()
+            await writer.wait_closed()
+    async def get_re_id(self) -> dict[str, Any]:
+        """Get the unique identifier of the retrieval engine instance."""
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            request = {"action": "get_re_id", "payload": {}}
             writer.write(encode_message(request))
             await writer.drain()
 

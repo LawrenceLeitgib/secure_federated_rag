@@ -33,7 +33,6 @@ class SimpleTerminalUser:
 
         try:
             response = await self.client.query(self.user_id, query_text)
-            print(f"Received response from retrieval engine: {response}")
         except Exception as e:
             print(f"Error while querying retrieval engine: {e}")
             return
@@ -44,23 +43,18 @@ class SimpleTerminalUser:
             return
 
         result = response.get("result", {})
-        results = result.get("results", [])
 
-        if not results:
-            print("No results found.")
-            return
+        answer = result.get("answer")
+        query=result.get("query")
+        retrieved_chunks=result.get("retrieved_chunks", [])
 
-        print(f"Received {len(results)} result(s):")
-        for idx, item in enumerate(results, start=1):
-            chunk_id = item.get("chunk_id")
-            score = item.get("score")
-            text = item.get("text")
-            print("-" * 40)
-            print(f"Result #{idx}")
-            print(f"Chunk ID: {chunk_id}")
-            print(f"Score   : {score}")
-            print("Text:")
-            print(text)
+        for chunk in retrieved_chunks:
+            score=chunk.get("score")
+            text=chunk.get("text")
+            print(f"Retrieved chunk with score {score}: {text[:100]}...")
+
+        print(f"Query: {query}")
+        print(f"Answer: {answer}")
 
 
 async def _main() -> None:

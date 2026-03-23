@@ -16,7 +16,6 @@ class LocalStorageProvider:
         }
 
     def get_chunk(self, chunk_id: str) -> EncryptedChunk:
-        print(f"LocalStorageProvider: Retrieving chunk {chunk_id}")
         if chunk_id not in self.storage:
             raise KeyError(f"Chunk {chunk_id} not found in storage")
 

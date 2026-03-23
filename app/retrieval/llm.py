@@ -50,6 +50,18 @@ class QwenLLM:
             torch_dtype="auto",
             device_map="auto",
         )
+
+        print("CUDA available:", torch.cuda.is_available())
+
+        if torch.cuda.is_available():
+            print("GPU count:", torch.cuda.device_count())
+            for i in range(torch.cuda.device_count()):
+                print(f"GPU {i}:", torch.cuda.get_device_name(i))
+
+        print("model.device:", self.model.device)
+
+        if hasattr(self.model, "hf_device_map"):
+            print("hf_device_map:", self.model.hf_device_map)
         self.model.eval()
 
     def _normalize_contexts(self, contexts: Iterable[str]) -> list[str]:

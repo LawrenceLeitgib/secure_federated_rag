@@ -11,12 +11,12 @@ from app.common.ledger_interaction import register_dataset, register_user
 from app.custodians.custodian import split_key_dummy
 from app.common.chunking import Dataset, EncryptedChunk, chunk_text
 from app.data_owner.merkle import build_merkle_root
-from app.retrieval.embeddings import embed_text_dummy
 
 from app.common.clients.storage_client import StorageClient
 from app.common.clients.blockchain_client import BlockchainClient
 from app.common.clients.custodian_client import CustodianClient
 from app.common.clients.retrieval_client import RetrievalClient
+from app.retrieval.embeddings import QwenEmbedder
 
 @dataclass
 class DataOwner:
@@ -33,6 +33,9 @@ class DataOwner:
     retrieval_client: RetrievalClient
 
     dataset_list: List[Dataset] = field(default_factory=list)
+    embedder: QwenEmbedder = field(default_factory=QwenEmbedder)
+
+    
 
     #add a constructor that that a name and return a dataOwner with a generated key pair and a user_id that is the sha256 hash of the public key
     @classmethod
@@ -58,6 +61,7 @@ class DataOwner:
             blockchain_client=blockchain_client,
             custodian_client=custodian_client,
             retrieval_client=retrieval_client,
+            embedder=QwenEmbedder(),
     )
 
     
@@ -80,7 +84,7 @@ class DataOwner:
 
         for chunk in chunks:
             leaf_hashes.append(chunk.chunk_id)
-            chunk.embedding = embed_text_dummy(chunk.text)
+            chunk.embedding = self.embedder.embed_text(chunk.text,is_query=False)
 
 
             dek=generate_key()
