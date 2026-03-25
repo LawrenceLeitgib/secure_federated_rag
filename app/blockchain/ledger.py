@@ -23,6 +23,23 @@ class SimpleLedger:
                 if payload.re_id == user_id and payload.dataset_id == dataset_id:   
                     return True
         return False
+    
+    def get_chunk_metadata(self, chunk_id: str) -> dict[str, str | dict]:
+        print(f"Retrieving metadata for chunk: {chunk_id}")
+        for entry in self.entries:
+            if entry.entry_type == LedgerEntryType.REGISTER_DATASET:
+                payload = entry.payload
+                chunk_id_to_encrypted_dek = payload.chunk_id_to_encrypted_dek
+
+                if chunk_id in chunk_id_to_encrypted_dek:
+                    return {
+                        "status": "ok",
+                        "result": {
+                            "dataset_id": payload.dataset_id,
+                            "encrypted_dek": chunk_id_to_encrypted_dek[chunk_id],
+                        },
+                    }
+        return {"status": "error", "error": "Chunk not found"}
 
     def print_entries(self) -> None:
         for i, entry in enumerate(self.entries):

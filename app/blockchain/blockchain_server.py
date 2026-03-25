@@ -62,6 +62,14 @@ class LedgerTCPServer:
                 authorized = self.ledger.is_authorized(user_id, dataset_id)
                 return {"status": "ok", "result": {"authorized": authorized}}
 
+            elif action == "get_chunk_metadata":
+                chunk_id = payload["chunk_id"]
+                chunk_metadata = self.ledger.get_chunk_metadata(chunk_id)
+                if chunk_metadata is None:
+                    return {"status": "error", "error": f"No metadata found for chunk_id: {chunk_id}"}
+                else:
+                    return {"status": "ok", "result": {"chunk_metadata": chunk_metadata}}
+                
             elif action == "print_entries":
                 # For debugging; prints on server side
                 self.ledger.print_entries()

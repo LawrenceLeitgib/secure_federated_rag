@@ -4,6 +4,7 @@ from typing import Any
 
 from app.common.clients.blockchain_client import BlockchainClient
 from app.common.clients.custodian_client import CustodianClient
+from app.common.clients.storage_client import StorageClient
 from app.retrieval.retrievalEngine import RetrievalEngine
 
 
@@ -22,12 +23,14 @@ class RetrievalEngineService:
 
     @classmethod
     async def create(cls, name: str) -> "RetrievalEngineService":
-        custodian_client = CustodianClient()
+        custodian_clients = [CustodianClient(),CustodianClient(port=9002)]  # Example: two custodian clients
         blockchain_client = BlockchainClient()
+        sotrage_client = StorageClient()
         engine = await RetrievalEngine.create(
             name=name,
-            custodian_client=custodian_client,
+            custodian_clients=custodian_clients,
             blockchain_client=blockchain_client,
+            storage_client=sotrage_client,
         )
         return cls(engine)
 

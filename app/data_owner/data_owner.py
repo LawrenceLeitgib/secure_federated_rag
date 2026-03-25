@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 import hashlib
 from typing import List, Optional
 
-from app.common.crypto.signing import generate_key_pairs, sign_data, verify_signature
-from app.common.crypto.symmetric import encrypt_bytes, generate_key,generate_dummy_kek
+from app.common.crypto.signing import generate_key_pairs
+from app.common.crypto.symmetric import encrypt_bytes, generate_key
+from app.common.crypto.asymmetric import encrypt_with_public_key, generate_threshold_keys
 from app.common.ledger_interaction import register_dataset, register_user
-from app.custodians.custodian import split_key_dummy
 from app.common.chunking import Dataset, EncryptedChunk, chunk_text
 from app.data_owner.merkle import build_merkle_root
 
@@ -29,8 +29,8 @@ class DataOwner:
 
     storage_client: StorageClient
     blockchain_client: BlockchainClient
-    custodian_client: CustodianClient
-    retrieval_client: RetrievalClient
+    custodian_clients: List[CustodianClient] = field(default_factory=list)
+    retrieval_client: RetrievalClient = field(default=None)
 
     dataset_list: List[Dataset] = field(default_factory=list)
     embedder: QwenEmbedder = field(default_factory=QwenEmbedder)
@@ -44,7 +44,7 @@ class DataOwner:
         name: str,
         storage_client: StorageClient,
         blockchain_client: BlockchainClient,
-        custodian_client: CustodianClient,
+        custodian_clients: List[CustodianClient],
         retrieval_client: RetrievalClient,
         password: Optional[bytes] = None,
     ) -> DataOwner:
@@ -59,7 +59,7 @@ class DataOwner:
             public_key=public_key,
             storage_client=storage_client,
             blockchain_client=blockchain_client,
-            custodian_client=custodian_client,
+            custodian_clients=custodian_clients,
             retrieval_client=retrieval_client,
             embedder=QwenEmbedder(),
     )
@@ -76,7 +76,7 @@ class DataOwner:
 
        
         #creat a kek 
-        kek = generate_dummy_kek()
+        public_kek, shares=  generate_threshold_keys(2, 2)
       
         leaf_hashes: list[str] = []
 
@@ -90,7 +90,7 @@ class DataOwner:
             dek=generate_key()
             encrypted_chunk = encrypt_bytes(chunk.text.encode("utf-8"), dek)
 
-            encrypted_dek = encrypt_bytes(dek,kek)
+            encrypted_dek = encrypt_with_public_key(dek.hex(), public_kek)
 
             encrypted_chunk = EncryptedChunk(
                 dataset_id="", # we can fill this in later with the merkle root
@@ -129,15 +129,16 @@ class DataOwner:
         print(f"the chunk IDs are: {'\n '.join(chunk.chunk_id for chunk in chunks)}")
         print()
         print()
-
-
-        signedLedgerEntry= register_dataset(dataset.dataset_id,self.user_id ,self.private_key)
+        #we want to define a datastructure instead of leaf which is List[str,str] where the first string is the chunk_id and the second string is the encrypted_dek.
+        chunk_id_to_encrypted_dek = {chunk.chunk_id: enc_chunk.encrypted_dek for chunk, enc_chunk in zip(chunks, encrypted_chunks)}
+        
+        signedLedgerEntry= register_dataset(dataset.dataset_id,chunk_id_to_encrypted_dek,self.user_id ,self.private_key)
         r=await self.blockchain_client.add_record(signedLedgerEntry)
         print(f"Registered dataset on blockchain with result: {r}")
-        share1, share2 = split_key_dummy(kek)
-        await self.custodian_client.store_share(self.user_id, merkle_root, share1)
-        print(f"Stored share for dataset: {merkle_root}, user: {self.user_id}, share: {share1}")
-        #await self.custodian_client.store_share(self.user_id, merkle_root, share2)
+
+
+        await self.custodian_clients[0].store_share(self.user_id, merkle_root, shares[0])
+        await self.custodian_clients[1].store_share(self.user_id, merkle_root, shares[1])
 
         self.dataset_list.append(dataset)
         return dataset

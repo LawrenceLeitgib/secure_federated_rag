@@ -1,8 +1,11 @@
 # app/custodians/custodian_server.py
 from __future__ import annotations
 
+import argparse
 import asyncio
 from typing import Any
+
+import threshold_crypto as tc
 
 from app.common.protocol import decode_message, encode_message
 from app.custodians.custodian_service import CustodianService
@@ -48,49 +51,32 @@ class CustodianTCPServer:
             if action == "store_share":
                 user_id: str = payload["user_id"]
                 dataset_id: str = payload["dataset_id"]
-                share_hex: str = payload["encrypted_private_key"]
-                share = bytes.fromhex(share_hex)
+                share: str = payload["private_share_key"]
+                share = tc.KeyShare.from_json(share)  # Convert back to KeyShare object
 
                 # Delegate to service
                 await self.service.store_share(user_id, dataset_id, share)
                 return {"status": "ok"}
 
-            elif action == "get_share":
-                dataset_id: str = payload["dataset_id"]
-                share = self.service.get_share(dataset_id)
-
-                if share is None:
-                    return {"status": "ok", "result": {"found": False}}
-                return {
-                    "status": "ok",
-                    "result": {
-                        "found": True,
-                        "share": share.hex(),
-                    },
-                }
-            
-            elif action == "get_plain_text_chunk":
+         
+            elif action == "get_partial_decryption":
                 chunk_id: str = payload["chunk_id"]
-                user_id: str = payload["user_id"]
+                re_id: str = payload["re_id"]
 
-                chunk,authorised = await self.service.get_plain_text_chunk(user_id,chunk_id)
+                partial_decryption, authorised = await self.service.get_partial_decryption(re_id,chunk_id)
                 if not authorised:
                     return {"status": "ok", "result": {"found": False, "authorized": False}}
-                if chunk is None:
+                if partial_decryption is None:
                     return {"status": "ok", "result": {"found": False, "authorized": True}}
                 
-                chunk_dict = {
-                    "dataset_id": chunk.dataset_id,
-                    "chunk_id": chunk.chunk_id,
-                    "text": chunk.text,  
-                }
+               
 
                 return {
                     "status": "ok",
                     "result": {
                         "found": True,
                         "authorized": True,
-                        "chunk": chunk_dict,
+                        "partial_decryption": partial_decryption,
                     },
                 }
 
@@ -105,17 +91,24 @@ class CustodianTCPServer:
 
 
 async def main() -> None:
-    custodian_id = "custodian_1"
-
-    server_obj = CustodianTCPServer(custodian_id=custodian_id)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--port",
+        type=int,
+        required=True,
+        help="TCP port for this custodian server",
+    )
+   
+    args = parser.parse_args()
+    server_obj = CustodianTCPServer(custodian_id=f"custodian_{args.port}")
     server = await asyncio.start_server(
         server_obj.handle_client,
         "127.0.0.1",
-        9001,
+        args.port,
     )
 
     addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets or [])
-    print(f"Custodian server '{custodian_id}' listening on {addrs}")
+    print(f"Custodian server 'custodian_{args.port}' listening on {addrs}")
 
     async with server:
         await server.serve_forever()

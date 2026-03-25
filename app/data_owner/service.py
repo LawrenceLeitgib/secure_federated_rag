@@ -14,12 +14,12 @@ class DataOwnerService:
     def __init__(self) -> None:
         self.owner: DataOwner | None = None
         self.storage_client = StorageClient()
-        self.custodian_client = CustodianClient()
+        self.custodian_clients = [CustodianClient(), CustodianClient(port=9002)]  
         self.blockchain_client = BlockchainClient()
         self.retrieval_client = RetrievalClient()
         
     async def create_owner(self, name: str) -> dict:
-        self.owner = await DataOwner.create(name, self.storage_client, self.blockchain_client, self.custodian_client, self.retrieval_client)
+        self.owner = await DataOwner.create(name, self.storage_client, self.blockchain_client, self.custodian_clients, self.retrieval_client)
         return {
             "user_id": self.owner.user_id,
             "name": self.owner.name,

@@ -50,3 +50,21 @@ class BlockchainClient:
             writer.close()
             await writer.wait_closed()
 
+
+    async def get_chunk_metadata(self, chunk_id: str) -> dict[str, Any]:
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            payload = {"chunk_id": chunk_id}
+            request = {"action": "get_chunk_metadata", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Storage server closed connection")
+
+            response = decode_message(line)
+            return response.get("result", {}).get("chunk_metadata", {})
+        finally:
+            writer.close()
+            await writer.wait_closed()

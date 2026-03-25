@@ -48,7 +48,8 @@ class EncryptedChunk:
     dataset_id: str
     chunk_id: str
     encrypted_data: bytes
-    encrypted_dek: bytes
+    encrypted_dek: str
+
 
 @dataclass
 class Dataset:

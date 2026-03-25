@@ -7,8 +7,9 @@ from numpy import byte
 
 from app.common.chunking import Chunk, EncryptedChunk
 from app.custodians.custodian import Custodian
-from app.common.clients.storage_client import StorageClient
 from app.common.clients.blockchain_client import BlockchainClient
+
+import threshold_crypto as tc
 
 
 class CustodianService:
@@ -17,50 +18,31 @@ class CustodianService:
         custodian_id: str,
     ) -> None:
         self.custodian = Custodian(custodian_id=custodian_id)
-        self.storage_client =   StorageClient()       # storage server
         self.blockchain_client = BlockchainClient() # ledger server
 
-    async def store_share(self, user_id: str, dataset_id: str, share: bytes) -> None:
+    async def store_share(self, user_id: str, dataset_id: str, share: tc.KeyShare) -> None:
         #TODO: in the future, check the blockain to verify that the user_id own the dataset.
 
         print(f"Storing share for dataset: {dataset_id}, user: {user_id}, share: {share}")
         # 1. Store locally in the custodian domain object
         self.custodian.store_share(dataset_id, share)
 
-    async def get_share(self, dataset_id: str) -> bytes | None:
-        print(f"Retrieving share for dataset: {dataset_id}")
-        return self.custodian.get_share(dataset_id)
-    
-    async def get_plain_text_chunk(self,user_id: str,chunk_id: str) -> tuple[Chunk | None, bool]:
-        print(f"Retrieving plain text chunk: {chunk_id}")
-        if self.blockchain_client is not None:
-            # Check if the custodian is authorized to access this dataset
-            #if not await self.blockchain_client.is_authorized(user_id, dataset_id):
-            #    return None, False  # Not authorized
-            pass  #TODO: implement a true authorization check here, for now we skip it to test the flow
-        else :
+   
+    async def get_partial_decryption(self,re_id: str,chunk_id: str) -> tuple[str | None, bool]:
+        print(f"Retrieving partial decryption for chunk: {chunk_id}")
+        if self.blockchain_client is  None:
             raise RuntimeError("Blockchain client not available for authorization check")
-
-
-        if self.storage_client is not None:
-            encrypted_chunk_payload = await self.storage_client.retrieve_chunk_async(chunk_id)
-            if encrypted_chunk_payload.get("status") == "ok":
-                result=encrypted_chunk_payload.get("result")
-                dataset_id = result.get("dataset_id")
-                chunk_id = result.get("chunk_id")
-                encrypted_chunk = result.get("encrypted_data")
-                encrypted_dek= result.get("encrypted_dek")
-                # Decrypt the chunk using the custodian's share (DEK)
-                chunk = self.custodian.decrypt_chunk(
-                    encrypted_chunk=EncryptedChunk(
-                        dataset_id=dataset_id,
-                        chunk_id=chunk_id,
-                        encrypted_data= bytes.fromhex(encrypted_chunk),
-                        encrypted_dek=bytes.fromhex(encrypted_dek)   
-                    )
-                )
-                return chunk, True
-              
-            else:
-                raise RuntimeError(f"Failed to retrieve chunk: {encrypted_chunk_payload.get('error')}")
-        return None, True
+        
+        chunkMetadata = await self.blockchain_client.get_chunk_metadata(chunk_id)
+        if chunkMetadata.get("status") != "ok":
+            raise RuntimeError(f"Failed to retrieve chunk metadata: {chunkMetadata.get('error')}")
+        metadata_result = chunkMetadata.get("result")
+        dataset_id = metadata_result.get("dataset_id")
+        authorized = await self.blockchain_client.is_authorized(re_id, dataset_id)
+       
+        if not authorized:
+            print(f"User {re_id} is not authorized to access dataset {dataset_id}")
+            return None, False
+        encrypted_dek= metadata_result.get("encrypted_dek")
+        partial_decryption = self.custodian.get_partial_decryption(encrypted_dek, dataset_id)
+        return partial_decryption, True

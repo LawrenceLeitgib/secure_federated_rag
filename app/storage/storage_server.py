@@ -48,14 +48,14 @@ class StorageTCPServer:
                 # Expect payload with the fields to build EncryptedChunk
                 chunk_id: str = payload["chunk_id"]
                 encrypted_data_hex: str = payload["encrypted_data"]
-                encrypted_dek_hex: str = payload["encrypted_dek"]
+                encrypted_dek: str = payload["encrypted_dek"]
                 dataset_id: str = payload.get("dataset_id")
 
                 encrypted_chunk = EncryptedChunk(
                     dataset_id=dataset_id,
                     chunk_id=chunk_id,
                     encrypted_data=bytes.fromhex(encrypted_data_hex),
-                    encrypted_dek=bytes.fromhex(encrypted_dek_hex),
+                    encrypted_dek=encrypted_dek,
                 )
 
                 self.storage.upload_chunk(encrypted_chunk)
@@ -66,6 +66,7 @@ class StorageTCPServer:
                 chunk_id: str = payload["chunk_id"]
                 print(f"Requesting chunk with chunk_id: {chunk_id}")
                 encrypted_chunk = self.storage.get_chunk(chunk_id)
+                print("found chunk, preparing response")
 
                 return {
                     "status": "ok",
@@ -73,7 +74,7 @@ class StorageTCPServer:
                         "dataset_id": encrypted_chunk.dataset_id,
                         "chunk_id": encrypted_chunk.chunk_id,
                         "encrypted_data": encrypted_chunk.encrypted_data.hex(),
-                        "encrypted_dek": encrypted_chunk.encrypted_dek.hex(),
+                        "encrypted_dek": encrypted_chunk.encrypted_dek,
                     },
                 }
 
