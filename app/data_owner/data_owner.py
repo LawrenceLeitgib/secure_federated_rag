@@ -69,10 +69,8 @@ class DataOwner:
         self,
         document_name: str,
         text: str,
-        chunk_size: int = 300,
-        overlap: int = 50,
     ) -> Dataset:
-        chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+        chunks = chunk_text(text)
 
        
         #creat a kek 

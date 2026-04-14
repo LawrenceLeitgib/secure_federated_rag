@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 import hashlib
+import time
 
 from app.common.clients.blockchain_client import BlockchainClient
 from app.common.clients.custodian_client import CustodianClient
@@ -98,9 +99,12 @@ class RetrievalEngine:
     
 
     async def answer_query(self, query_text: str, k: int = 3) -> dict:
+        startTime=time.time()
         retrieved = await self.query(query_text=query_text, k=k)
+        finishTime=time.time()
+        print(f"Time taken for retrieval k={k}: {finishTime - startTime:.2f} seconds")
         for chunk_id, score, text in retrieved:
-            print(f"Retrieved chunk for RAG: chunk_id={chunk_id}, score={score}, text={text}...")
+            print(f"Retrieved chunk for RAG: chunk_id={chunk_id[:10]}, score={score:.2f}, text={text}...")
 
         contexts = [text for _, _, text in retrieved]
         llm_response = self.llm.generate_answer(

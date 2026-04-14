@@ -1,37 +1,65 @@
 from __future__ import annotations
-from ast import List
-from dataclasses import dataclass, field, field
+from typing import List
+from dataclasses import dataclass, field
 
 from app.common.crypto.hashing import sha256_text
 
 
-def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[Chunk]:
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be > 0")
-    if overlap >= chunk_size:
-        raise ValueError("overlap must be smaller than chunk_size")
+def chunk_text(text: str, min_size: int = 200, max_size: int = 400) -> list["Chunk"]:
+    if min_size <= 0:
+        raise ValueError("min_size must be > 0")
+    if max_size < min_size:
+        raise ValueError("max_size must be >= min_size")
 
     chunks: list[Chunk] = []
+    n = len(text)
     start = 0
-    index = 0
 
-    while start < len(text):
-        end = min(len(text), start + chunk_size)
-        chunk_text_value = text[start:end]
+    while start < n:
+        max_end = min(start + max_size, n)
+        # ensure we don't cut before min_size (unless we're at the end)
+        search_start = min(max(start + min_size, start), max_end)
 
-        chunks.append(
-            Chunk(
-                chunk_id=sha256_text(chunk_text_value),
-                text=chunk_text_value,
-                dataset_id="",  # to be filled in later when creating the Dataset
+        split_idx: int | None = None
+
+        # 1) Prefer end-of-sentence punctuation
+        for i in range(max_end - 1, search_start - 1, -1):
+            if text[i] in ".!?":
+                split_idx = i + 1  # include punctuation
+                break
+
+        # 2) If none, try comma
+        if split_idx is None:
+            for i in range(max_end - 1, search_start - 1, -1):
+                if text[i] == ",":
+                    split_idx = i + 1
+                    break
+
+        # 3) If none, try whitespace
+        if split_idx is None:
+            for i in range(max_end - 1, search_start - 1, -1):
+                if text[i].isspace():
+                    split_idx = i
+                    break
+
+        # 4) Fallback: just cut at max_end
+        if split_idx is None or split_idx <= start:
+            split_idx = max_end
+
+        chunk_text_value = text[start:split_idx].strip()
+        if chunk_text_value:
+            chunks.append(
+                Chunk(
+                    chunk_id=sha256_text(chunk_text_value),
+                    text=chunk_text_value,
+                    dataset_id="",  # to be filled in later when creating the Dataset
+                )
             )
-        )
 
-        if end == len(text):
-            break
-
-        start = end - overlap
-        index += 1
+        # Advance start, skipping leading whitespace for next chunk
+        start = split_idx
+        while start < n and text[start].isspace():
+            start += 1
 
     return chunks
 
@@ -42,6 +70,7 @@ class Chunk:
     chunk_id: str
     text: str
     embedding: list[float] | None = None
+
 
 @dataclass
 class EncryptedChunk:
@@ -54,6 +83,6 @@ class EncryptedChunk:
 @dataclass
 class Dataset:
     dataset_id: str
-    owner_id: str #the merkle tree root
+    owner_id: str  # the merkle tree root
     document_name: str
     chunks: List[Chunk] = field(default_factory=list)

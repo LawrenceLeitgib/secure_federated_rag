@@ -43,8 +43,6 @@ class DataOwnerService:
         self,
         document_name: str,
         text: str,
-        chunk_size: int = 300,
-        overlap: int = 50,
     ) -> dict:
         owner = self._require_owner()
 
@@ -56,9 +54,7 @@ class DataOwnerService:
         # - computing Merkle root
         dataset = await owner.upload_document(
             document_name=document_name,
-            text=text,
-            chunk_size=chunk_size,
-            overlap=overlap,
+            text=text
         )
 
         return {
