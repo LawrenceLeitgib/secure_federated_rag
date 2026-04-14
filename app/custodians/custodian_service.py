@@ -6,6 +6,7 @@ from typing import Any, Optional
 from numpy import byte
 
 from app.common.chunking import Chunk, EncryptedChunk
+from app.common.crypto.hashing import sha256_text
 from app.custodians.custodian import Custodian
 from app.common.clients.blockchain_client import BlockchainClient
 
@@ -28,7 +29,7 @@ class CustodianService:
         self.custodian.store_share(dataset_id, share)
 
    
-    async def get_partial_decryption(self,re_id: str,chunk_id: str) -> tuple[str | None, bool]:
+    async def get_partial_decryption(self,re_id: str,chunk_id: str, encrypted_dek: str) -> tuple[str | None, bool]:
         print(f"Retrieving partial decryption for chunk: {chunk_id}")
         if self.blockchain_client is  None:
             raise RuntimeError("Blockchain client not available for authorization check")
@@ -43,6 +44,9 @@ class CustodianService:
         if not authorized:
             print(f"User {re_id} is not authorized to access dataset {dataset_id}")
             return None, False
-        encrypted_dek= metadata_result.get("encrypted_dek")
+        encrypted_dek_hash= metadata_result.get("encrypted_dek_hash")
+        if encrypted_dek_hash != sha256_text(encrypted_dek):
+            print(f"Encrypted DEK hash mismatch for chunk {chunk_id}: expected {encrypted_dek_hash}, got {sha256_text(encrypted_dek.encode()).hexdigest()}")
+            return None, False
         partial_decryption = self.custodian.get_partial_decryption(encrypted_dek, dataset_id)
         return partial_decryption, True

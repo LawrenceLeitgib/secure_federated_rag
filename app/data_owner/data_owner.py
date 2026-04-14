@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import hashlib
 from typing import List, Optional
 
+from app.common.crypto.hashing import sha256_text
 from app.common.crypto.signing import generate_key_pairs
 from app.common.crypto.symmetric import encrypt_bytes, generate_key
 from app.common.crypto.asymmetric import encrypt_with_public_key, generate_threshold_keys
@@ -128,9 +129,9 @@ class DataOwner:
         print()
         print()
         #we want to define a datastructure instead of leaf which is List[str,str] where the first string is the chunk_id and the second string is the encrypted_dek.
-        chunk_id_to_encrypted_dek = {chunk.chunk_id: enc_chunk.encrypted_dek for chunk, enc_chunk in zip(chunks, encrypted_chunks)}
+        chunk_id_to_encrypted_dek_hash = {chunk.chunk_id: sha256_text(enc_chunk.encrypted_dek) for chunk, enc_chunk in zip(chunks, encrypted_chunks)}
         
-        signedLedgerEntry= register_dataset(dataset.dataset_id,chunk_id_to_encrypted_dek,self.user_id ,self.private_key)
+        signedLedgerEntry= register_dataset(dataset.dataset_id,chunk_id_to_encrypted_dek_hash,self.user_id ,self.private_key)
         r=await self.blockchain_client.add_record(signedLedgerEntry)
         print(f"Registered dataset on blockchain with result: {r}")
 

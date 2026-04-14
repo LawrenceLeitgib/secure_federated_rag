@@ -22,11 +22,11 @@ def register_user(id: str, public_key: str, private_key: bytes) -> SignedLedgerE
     sign_entry = sign_ledger_entry(ledger_entry,private_key)
     return sign_entry
 
-def register_dataset(dataset_id: str, chunk_id_to_encrypted_dek: dict[str, str], dataOwner_id: str, private_key: bytes) -> SignedLedgerEntry:
+def register_dataset(dataset_id: str, chunk_id_to_encrypted_dek_hash: dict[str, str], dataOwner_id: str, private_key: bytes) -> SignedLedgerEntry:
     payload = RegisterDatasetPayload(
         dataset_id=dataset_id,
         owner_id=dataOwner_id,
-        chunk_id_to_encrypted_dek=chunk_id_to_encrypted_dek,
+        chunk_id_to_encrypted_dek_hash=chunk_id_to_encrypted_dek_hash,
     )
     ledger_entry = LedgerEntry(
         entry_type=LedgerEntryType.REGISTER_DATASET,
@@ -65,7 +65,7 @@ class RegisterUser:
 class RegisterDatasetPayload:
     dataset_id: str
     owner_id: str
-    chunk_id_to_encrypted_dek: dict[str, str]  # map from chunk_id to encrypted_dek
+    chunk_id_to_encrypted_dek_hash: dict[str, str]  # map from chunk_id to encrypted_dek_hash
 
 
 @dataclass

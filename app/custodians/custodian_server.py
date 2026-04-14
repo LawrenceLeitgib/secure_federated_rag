@@ -62,8 +62,9 @@ class CustodianTCPServer:
             elif action == "get_partial_decryption":
                 chunk_id: str = payload["chunk_id"]
                 re_id: str = payload["re_id"]
+                encrypted_dek: str = payload["encrypted_dek"]
 
-                partial_decryption, authorised = await self.service.get_partial_decryption(re_id,chunk_id)
+                partial_decryption, authorised = await self.service.get_partial_decryption(re_id,chunk_id, encrypted_dek)
                 if not authorised:
                     return {"status": "ok", "result": {"found": False, "authorized": False}}
                 if partial_decryption is None:

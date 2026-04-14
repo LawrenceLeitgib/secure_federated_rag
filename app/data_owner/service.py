@@ -76,9 +76,12 @@ class DataOwnerService:
             re_id=re_id,
             private_key=owner.private_key,) )
         
-    async def give_access(self, dataset_id: str, re_id: str) -> None:
-        await self.grant_authorization(dataset_id, re_id)
+    async def give_access(self, dataset_id: str, re_id: str,test: bool = False) -> None:
+        if not test:
+            await self.grant_authorization(dataset_id, re_id)
         await self.give_embeddings(dataset_id, re_id)
+  
+
 
     async def get_retrieval_engine_id(self) -> str:
         # For simplicity, we assume there's only one retrieval engine and we can get its id from the retrieval client

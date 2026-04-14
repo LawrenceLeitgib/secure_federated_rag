@@ -64,16 +64,24 @@ class RetrievalEngine:
         decrypted_results: list[tuple[str, float, str]] = []
 
         for chunk_id, score in queryResults:
-            raw1=await self.custodian_clients[0].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id)
-            if raw1.get("status") != "ok":
-                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 1")
-            raw2=await self.custodian_clients[1].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id)
-            if raw2.get("status") != "ok":
-                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 2")
             encrypted_chunk_payload = await self.storage_client.retrieve_chunk_async(chunk_id)
             if encrypted_chunk_payload.get("status") != "ok":
                 raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from storage server")
            
+            raw1=await self.custodian_clients[0].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id,encrypted_dek=encrypted_chunk_payload.get("result").get("encrypted_dek"))
+            if raw1.get("status") != "ok":
+                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 1")
+            raw2=await self.custodian_clients[1].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id,encrypted_dek=encrypted_chunk_payload.get("result").get("encrypted_dek"))
+            if raw2.get("status") != "ok":
+                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 2")
+            
+            if(raw1.get("result").get("authorized") == False or raw2.get("result").get("authorized") == False):
+                print(f"Not authorized to access chunk {chunk_id}")
+                continue
+            if(raw1.get("result").get("found") == False or raw2.get("result").get("found") == False):
+                print(f"DEK for chunk {chunk_id} not found in custodian")
+                continue   
+ 
             encrypted_chunk = encrypted_chunk_payload.get("result").get("encrypted_data")
             encrypted_dek = tc.EncryptedMessage.from_json(encrypted_chunk_payload.get("result").get("encrypted_dek"))
 

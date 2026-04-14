@@ -38,10 +38,10 @@ class CustodianClient:
             writer.close()
             await writer.wait_closed()
 
-    async def get_partial_decryption(self, re_id: str, chunk_id: str) -> dict[str, Any]:
+    async def get_partial_decryption(self, re_id: str, chunk_id: str,encrypted_dek: str) -> dict[str, Any]:
         reader, writer = await asyncio.open_connection(self.host, self.port)
         try:
-            payload = {"re_id": re_id, "chunk_id": chunk_id}
+            payload = {"re_id": re_id, "chunk_id": chunk_id, "encrypted_dek": encrypted_dek}
             request = {"action": "get_partial_decryption", "payload": payload}
             writer.write(encode_message(request))
             await writer.drain()

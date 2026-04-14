@@ -29,14 +29,14 @@ class SimpleLedger:
         for entry in self.entries:
             if entry.entry_type == LedgerEntryType.REGISTER_DATASET:
                 payload = entry.payload
-                chunk_id_to_encrypted_dek = payload.chunk_id_to_encrypted_dek
+                chunk_id_to_encrypted_dek_hash = payload.chunk_id_to_encrypted_dek_hash
 
-                if chunk_id in chunk_id_to_encrypted_dek:
+                if chunk_id in chunk_id_to_encrypted_dek_hash:
                     return {
                         "status": "ok",
                         "result": {
                             "dataset_id": payload.dataset_id,
-                            "encrypted_dek": chunk_id_to_encrypted_dek[chunk_id],
+                            "encrypted_dek_hash": chunk_id_to_encrypted_dek_hash[chunk_id],
                         },
                     }
         return {"status": "error", "error": "Chunk not found"}

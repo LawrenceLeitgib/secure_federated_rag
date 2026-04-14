@@ -137,7 +137,7 @@ async def initialize_for_testing(service):
     print(f"Granted access to dataset {dataset1['dataset_id']} for retriever {re_id}")
     await service.give_access(dataset_id=dataset2["dataset_id"], re_id=re_id)
     print(f"Granted access to dataset {dataset2['dataset_id']} for retriever {re_id}")
-    await service.give_access(dataset_id=dataset3["dataset_id"], re_id=re_id)
+    await service.give_access(dataset_id=dataset3["dataset_id"], re_id=re_id,test=True)
     print(f"Granted access to dataset {dataset3['dataset_id']} for retriever {re_id}")
     await service.give_access(dataset_id=dataset4["dataset_id"], re_id=re_id)
     print(f"Granted access to dataset {dataset4['dataset_id']} for retriever {re_id}")
