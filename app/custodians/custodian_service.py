@@ -22,14 +22,17 @@ class CustodianService:
         self.blockchain_client = BlockchainClient() # ledger server
 
     async def store_share(self, user_id: str, dataset_id: str, share: tc.KeyShare) -> None:
-        #TODO: in the future, check the blockain to verify that the user_id own the dataset.
+        #check the blockain to verify that the user_id own the dataset.
+        owner_id = await self.blockchain_client.get_dataset_owner(dataset_id)
+        if owner_id != user_id:
+            raise RuntimeError(f"User {user_id} is not the owner of dataset {dataset_id}")
 
         print(f"Storing share for dataset: {dataset_id}, user: {user_id}, share: {share}")
         # 1. Store locally in the custodian domain object
         self.custodian.store_share(dataset_id, share)
 
    
-    async def get_partial_decryption(self,re_id: str,chunk_id: str, encrypted_dek: str) -> tuple[str | None, bool]:
+    async def get_partial_decryption(self, re_id: str,chunk_id: str, encrypted_dek: str) -> tuple[str | None, bool]:
         print(f"Retrieving partial decryption for chunk: {chunk_id}")
         if self.blockchain_client is  None:
             raise RuntimeError("Blockchain client not available for authorization check")

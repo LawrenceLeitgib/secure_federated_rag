@@ -74,6 +74,12 @@ class LedgerTCPServer:
                 # For debugging; prints on server side
                 self.ledger.print_entries()
                 return {"status": "ok"}
+            elif action == "get_dataset_owner":
+                dataset_id = payload["dataset_id"]
+                for entry in self.ledger.entries:
+                    if entry.entry_type == "REGISTER_DATASET" and entry.payload.dataset_id == dataset_id:
+                        return {"status": "ok", "result": {"owner_id": entry.payload.owner_id}}
+                return {"status": "error", "error": f"No owner found for dataset_id: {dataset_id}"}
 
             else:
                 return {"status": "error", "error": f"Unknown action: {action}"}

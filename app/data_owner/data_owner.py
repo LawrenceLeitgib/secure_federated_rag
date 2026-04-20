@@ -100,7 +100,7 @@ class DataOwner:
             )
             encrypted_chunks.append(encrypted_chunk)
 
-
+        print(f"Leaf hashes: {leaf_hashes}")
         merkle_root = build_merkle_root(leaf_hashes)
 
         for chunk in chunks:

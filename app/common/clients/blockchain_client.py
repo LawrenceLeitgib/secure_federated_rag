@@ -68,3 +68,21 @@ class BlockchainClient:
         finally:
             writer.close()
             await writer.wait_closed()
+
+    async def get_dataset_owner(self, dataset_id: str) -> str:
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            payload = {"dataset_id": dataset_id}
+            request = {"action": "get_dataset_owner", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Storage server closed connection")
+
+            response = decode_message(line)
+            return response.get("result", {}).get("owner_id", "")
+        finally:
+            writer.close()
+            await writer.wait_closed()
