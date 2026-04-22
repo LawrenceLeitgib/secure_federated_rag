@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import hashlib
 from typing import List, Optional
 
+from app.common.benchmarking import BenchmarkReport, now
 from app.common.crypto.hashing import sha256_text
 from app.common.crypto.signing import generate_key_pairs
 from app.common.crypto.symmetric import encrypt_bytes, generate_key
@@ -71,23 +72,44 @@ class DataOwner:
         document_name: str,
         text: str,
     ) -> Dataset:
+        dataset, _ = await self.upload_document_with_benchmark(
+            document_name=document_name,
+            text=text,
+        )
+        return dataset
+
+    async def upload_document_with_benchmark(
+        self,
+        document_name: str,
+        text: str,
+    ) -> tuple[Dataset, dict]:
+        benchmark = BenchmarkReport()
+        total_start = now()
+
+        chunking_start = now()
         chunks = chunk_text(text)
+        benchmark.add_duration("chunking_ms", chunking_start)
+        benchmark.set_counter("num_chunks", len(chunks))
+
+        embedding_start = now()
         chunk_embeddings = await self.embedder.embed_texts(
             [chunk.text for chunk in chunks],
             is_query=False,
         )
+        benchmark.add_duration("embedding_generation_ms", embedding_start)
 
         for chunk, embedding in zip(chunks, chunk_embeddings):
             chunk.embedding = embedding
 
-       
-        #creat a kek 
+        keygen_start = now()
         public_kek, shares=  generate_threshold_keys(2, 2)
+        benchmark.add_duration("threshold_key_generation_ms", keygen_start)
       
         leaf_hashes: list[str] = []
 
         encrypted_chunks: list[EncryptedChunk] = []
 
+        encryption_start = now()
         for chunk in chunks:
             leaf_hashes.append(chunk.chunk_id)
 
@@ -104,9 +126,12 @@ class DataOwner:
 
             )
             encrypted_chunks.append(encrypted_chunk)
+        benchmark.add_duration("chunk_encryption_ms", encryption_start)
 
         print(f"Leaf hashes: {leaf_hashes}")
+        merkle_start = now()
         merkle_root = build_merkle_root(leaf_hashes)
+        benchmark.add_duration("merkle_root_ms", merkle_start)
 
         for chunk in chunks:
             chunk.dataset_id = merkle_root
@@ -115,11 +140,12 @@ class DataOwner:
         for enc_chunk in encrypted_chunks:
             enc_chunk.dataset_id = merkle_root
             
-        
+        storage_start = now()
         results = await asyncio.gather(
         *(self.storage_client.upload_chunk_async(enc_chunk) for enc_chunk in encrypted_chunks),
          return_exceptions=True,
         )
+        benchmark.add_duration("storage_upload_ms", storage_start)
         print(f"Finished uploading chunks to storage. Results: {results}")
 
 
@@ -137,19 +163,22 @@ class DataOwner:
         chunk_id_to_encrypted_dek_hash = {chunk.chunk_id: sha256_text(enc_chunk.encrypted_dek) for chunk, enc_chunk in zip(chunks, encrypted_chunks)}
         
         signedLedgerEntry= register_dataset(dataset.dataset_id,chunk_id_to_encrypted_dek_hash,self.user_id ,self.private_key)
+        blockchain_start = now()
         r=await self.blockchain_client.add_record(signedLedgerEntry)
+        benchmark.add_duration("blockchain_registration_ms", blockchain_start)
         print(f"Registered dataset on blockchain with result: {r}")
 
-
+        custodian_start = now()
         await self.custodian_clients[0].store_share(self.user_id, merkle_root, shares[0])
         await self.custodian_clients[1].store_share(self.user_id, merkle_root, shares[1])
+        benchmark.add_duration("custodian_share_distribution_ms", custodian_start)
 
         self.dataset_list.append(dataset)
-        return dataset
+        benchmark.add_duration("total_ms", total_start)
+        return dataset, benchmark.to_dict()
     
     def get_embeddings(self, dataset_id: str) -> list[tuple[str, list[float]]]:
         dataset = next((d for d in self.dataset_list if d.dataset_id == dataset_id), None)
         if dataset is None:
             raise KeyError(f"Dataset {dataset_id} not found for owner {self.user_id}")
         return [(chunk.chunk_id, chunk.embedding) for chunk in dataset.chunks]
-

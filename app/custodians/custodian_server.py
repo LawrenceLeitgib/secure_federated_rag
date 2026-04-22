@@ -64,11 +64,25 @@ class CustodianTCPServer:
                 re_id: str = payload["re_id"]
                 encrypted_dek: str = payload["encrypted_dek"]
 
-                partial_decryption, authorised = await self.service.get_partial_decryption(re_id,chunk_id, encrypted_dek)
+                partial_decryption, authorised, benchmark = await self.service.get_partial_decryption(re_id,chunk_id, encrypted_dek)
                 if not authorised:
-                    return {"status": "ok", "result": {"found": False, "authorized": False}}
+                    return {
+                        "status": "ok",
+                        "result": {
+                            "found": False,
+                            "authorized": False,
+                            "benchmark": benchmark,
+                        },
+                    }
                 if partial_decryption is None:
-                    return {"status": "ok", "result": {"found": False, "authorized": True}}
+                    return {
+                        "status": "ok",
+                        "result": {
+                            "found": False,
+                            "authorized": True,
+                            "benchmark": benchmark,
+                        },
+                    }
                 
                
 
@@ -78,6 +92,7 @@ class CustodianTCPServer:
                         "found": True,
                         "authorized": True,
                         "partial_decryption": partial_decryption,
+                        "benchmark": benchmark,
                     },
                 }
 

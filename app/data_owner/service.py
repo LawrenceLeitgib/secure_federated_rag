@@ -63,6 +63,25 @@ class DataOwnerService:
             "document_name": dataset.document_name,
             "num_chunks": len(dataset.chunks),
         }
+
+    async def upload_text_document_with_benchmark(
+        self,
+        document_name: str,
+        text: str,
+    ) -> dict:
+        owner = self._require_owner()
+        dataset, benchmark = await owner.upload_document_with_benchmark(
+            document_name=document_name,
+            text=text,
+        )
+
+        return {
+            "dataset_id": dataset.dataset_id,
+            "owner_id": dataset.owner_id,
+            "document_name": dataset.document_name,
+            "num_chunks": len(dataset.chunks),
+            "benchmark": benchmark,
+        }
     
     async def give_embeddings(self, dataset_id: str, re_id: str) -> None:
         owner = self._require_owner()
