@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 
 DEFAULT_RESULTS_DIR = Path("bench_mark_result")
-EXCLUDED_TIMINGS = {"total_ms", "client_roundtrip_ms", "retrieval_total_ms"}
+DEFAULT_OUTPUT_DIR = Path("bench_mark_result_graphs")
+BASE_EXCLUDED_TIMINGS = {"total_ms", "client_roundtrip_ms", "retrieval_total_ms"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,6 +19,12 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_RESULTS_DIR,
         help="Directory containing benchmark JSON files.",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help="Directory where generated graph images will be stored.",
+    )
     return parser.parse_args()
 
 
@@ -29,8 +36,15 @@ def load_final_average_json_files(results_dir: Path) -> list[Path]:
     )
 
 
-def compute_component_percentages(timings_ms: dict[str, float]) -> tuple[list[str], list[float]]:
-    included = [(name, value) for name, value in timings_ms.items() if name not in EXCLUDED_TIMINGS and value > 0]
+def compute_component_percentages(
+    timings_ms: dict[str, float],
+    excluded_timings: set[str],
+) -> tuple[list[str], list[float]]:
+    included = [
+        (name, value)
+        for name, value in timings_ms.items()
+        if name not in excluded_timings and value > 0
+    ]
     total = sum(value for _, value in included)
     if total <= 0:
         return [], []
@@ -39,13 +53,23 @@ def compute_component_percentages(timings_ms: dict[str, float]) -> tuple[list[st
     return labels, percentages
 
 
-def generate_graph(json_path: Path) -> Path | None:
+def build_output_path(output_dir: Path, json_path: Path, suffix: str) -> Path:
+    return output_dir / f"{json_path.stem}_{suffix}.png"
+
+
+def generate_graph(
+    json_path: Path,
+    output_dir: Path,
+    excluded_timings: set[str],
+    filename_suffix: str,
+    title_suffix: str,
+) -> Path | None:
     import matplotlib.pyplot as plt
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     benchmark = payload.get("benchmark", {})
     timings_ms = benchmark.get("timings_ms", {})
-    labels, percentages = compute_component_percentages(timings_ms)
+    labels, percentages = compute_component_percentages(timings_ms, excluded_timings)
     if not labels:
         return None
 
@@ -54,7 +78,7 @@ def generate_graph(json_path: Path) -> Path | None:
     plt.ylabel("Time Share (%)")
     plt.xlabel("Component")
     plt.title(
-        f"{payload.get('benchmark_type', 'benchmark').title()} Final Average Component Time Proportions"
+        f"{payload.get('benchmark_type', 'benchmark').title()} Final Average Component Time Proportions {title_suffix}"
     )
     plt.xticks(rotation=35, ha="right")
     plt.ylim(0, max(percentages) * 1.2)
@@ -69,7 +93,7 @@ def generate_graph(json_path: Path) -> Path | None:
         )
 
     plt.tight_layout()
-    output_path = json_path.with_suffix(".png")
+    output_path = build_output_path(output_dir, json_path, filename_suffix)
     plt.savefig(output_path, dpi=160)
     plt.close()
     return output_path
@@ -78,11 +102,7 @@ def generate_graph(json_path: Path) -> Path | None:
 def main() -> None:
     args = parse_args()
     args.results_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        import matplotlib.pyplot as _  # noqa: F401
-    except ModuleNotFoundError:
-        print("matplotlib is required to generate graphs. Install dependencies from requirements.txt first.")
-        return
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
     json_files = load_final_average_json_files(args.results_dir)
     if not json_files:
@@ -90,11 +110,28 @@ def main() -> None:
         return
 
     for json_path in json_files:
-        output_path = generate_graph(json_path)
-        if output_path is None:
+        with_embedding_and_llm = generate_graph(
+            json_path=json_path,
+            output_dir=args.output_dir,
+            excluded_timings=BASE_EXCLUDED_TIMINGS,
+            filename_suffix="with_embedding_and_llm",
+            title_suffix="(with embedding and llm)",
+        )
+        without_embedding_and_llm = generate_graph(
+            json_path=json_path,
+            output_dir=args.output_dir,
+            excluded_timings=BASE_EXCLUDED_TIMINGS | {"embedding_generation_ms", "llm_ms"},
+            filename_suffix="without_embedding_and_llm",
+            title_suffix="(without embedding and llm)",
+        )
+
+        if with_embedding_and_llm is None and without_embedding_and_llm is None:
             print(f"Skipped {json_path}: no component timings available")
             continue
-        print(f"Generated {output_path}")
+        if with_embedding_and_llm is not None:
+            print(f"Generated {with_embedding_and_llm}")
+        if without_embedding_and_llm is not None:
+            print(f"Generated {without_embedding_and_llm}")
 
 
 if __name__ == "__main__":
