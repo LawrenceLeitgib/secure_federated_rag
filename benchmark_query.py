@@ -65,16 +65,14 @@ def average_reports(reports: list[dict]) -> dict:
     return {"timings_ms": avg_timings, "counters": avg_counters}
 
 
-def save_query_result(run_index: int, query: str, benchmark: dict, timestamp: str):
+def save_run_results(run_index: int, query_results: list[dict], timestamp: str):
     payload = {
         "benchmark_type": "query",
-        "result_kind": "query",
+        "result_kind": "run_details",
         "run_index": run_index,
-        "query": query,
-        "benchmark": benchmark,
+        "results": query_results,
     }
-    safe_query = "".join(ch if ch.isalnum() else "_" for ch in query).strip("_")[:80] or "query"
-    filename = f"query_run_{run_index:03d}_{safe_query}_{timestamp}.json"
+    filename = f"query_run_{run_index:03d}_details_{timestamp}.json"
     return write_result_json(filename, payload)
 
 
@@ -96,6 +94,7 @@ async def run_once(run_index: int, queries: list[str], user_id: str, timestamp: 
         client = RetrievalClient()
 
         reports: list[dict] = []
+        query_results: list[dict] = []
         for query in queries:
             request_start = now()
             response = await client.query(user_id=user_id, query_text=query)
@@ -109,10 +108,18 @@ async def run_once(run_index: int, queries: list[str], user_id: str, timestamp: 
             benchmark["timings_ms"]["client_roundtrip_ms"] = roundtrip_ms
             benchmark["counters"]["retrieved_chunks"] = len(result.get("retrieved_chunks", []))
             reports.append(benchmark)
+            query_results.append(
+                {
+                    "query": query,
+                    "benchmark": benchmark,
+                }
+            )
 
             print_report(f"Run {run_index} query={query}", benchmark)
-            saved_path = save_query_result(run_index, query, benchmark, timestamp)
-            print(f"  saved_json: {saved_path}")
+
+        if query_results:
+            saved_path = save_run_results(run_index, query_results, timestamp)
+            print(f"Saved run details JSON to {saved_path}")
 
         if reports:
             average_report = average_reports(reports)

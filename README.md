@@ -14,6 +14,6 @@ By default, both benchmarks initialize the five wiki data owners (`dataOwner1` t
 
 `benchmark_query.py` first loads all wiki datasets and grants retrieval access, then benchmarks the query path. It reports embedding generation, vector search, storage provider access, custodian time, blockchain authorization time inside custodians, LLM generation, and end-to-end total time.
 
-Both benchmark scripts now also write structured JSON files into `bench_mark_result/`. They save individual run outputs plus one `final_average` JSON per run.
+Both benchmark scripts now also write structured JSON files into `bench_mark_result/`. They save one combined `run_details` JSON plus one `final_average` JSON per run.
 
 `generate_benchmark_bar_graph.py` scans `bench_mark_result/` for those `final_average` JSON files and creates `.png` bar charts next to them. Each bar shows the proportion of total component time for the averaged result only.

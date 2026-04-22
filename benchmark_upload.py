@@ -46,21 +46,22 @@ def average_reports(reports: list[dict]) -> dict:
     return {"timings_ms": avg_timings, "counters": avg_counters}
 
 
-def save_document_result(run_index: int, result: dict, timestamp: str):
+def save_run_results(run_index: int, upload_results: list[dict], timestamp: str):
     payload = {
         "benchmark_type": "upload",
-        "result_kind": "document",
+        "result_kind": "run_details",
         "run_index": run_index,
-        "owner_name": result["owner_name"],
-        "document_name": result["document_name"],
-        "dataset_id": result["dataset_id"],
-        "benchmark": result["benchmark"],
+        "results": [
+            {
+                "owner_name": result["owner_name"],
+                "document_name": result["document_name"],
+                "dataset_id": result["dataset_id"],
+                "benchmark": result["benchmark"],
+            }
+            for result in upload_results
+        ],
     }
-    filename = (
-        f"upload_run_{run_index:03d}_{result['owner_name']}_{result['document_name']}_{timestamp}.json"
-        .replace(" ", "_")
-        .replace("/", "_")
-    )
+    filename = f"upload_run_{run_index:03d}_details_{timestamp}.json"
     return write_result_json(filename, payload)
 
 
@@ -86,8 +87,10 @@ async def run_once(run_index: int, timestamp: str) -> None:
             f"Owner={result['owner_name']} document={result['document_name']} dataset_id={result['dataset_id']}",
             result["benchmark"],
         )
-        saved_path = save_document_result(run_index, result, timestamp)
-        print(f"  saved_json: {saved_path}")
+
+    if upload_results:
+        saved_path = save_run_results(run_index, upload_results, timestamp)
+        print(f"Saved run details JSON to {saved_path}")
 
     if reports:
         average_report = average_reports(reports)
