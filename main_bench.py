@@ -14,6 +14,10 @@ SERVER_MODULES = {
     "retrieval_server": ("app.retrieval.retrieval_server", ""),
 }
 
+CLIENT_MODULES = {
+    "user_client": ("app.user.user_client", ""),
+}
+
 DATA_OWNER_NAMES = [
     "dataOwner1",
     "dataOwner2",
@@ -51,8 +55,12 @@ def main() -> None:
         processes.append(open_in_new_terminal(owner_name, module, extra_args))
         time.sleep(0.5)
 
+    for client_name, (module, extra_args) in CLIENT_MODULES.items():
+        processes.append(open_in_new_terminal(client_name, module, extra_args))
+        time.sleep(0.5)
+
     try:
-        print("Infrastructure and five data owners started in separate terminals.")
+        print("Infrastructure, five data owners, and user client started in separate terminals.")
         print("Press Ctrl+C here to exit this launcher (other terminals stay open).")
         while True:
             time.sleep(60)
