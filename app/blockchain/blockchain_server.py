@@ -7,6 +7,7 @@ from typing import Any
 from app.common.protocol import decode_message, encode_message
 from app.blockchain.ledger import SimpleLedger
 from app.common.ledger_interaction import (
+    LedgerEntryType,
     SignedLedgerEntry,
 )
 
@@ -77,7 +78,7 @@ class LedgerTCPServer:
             elif action == "get_dataset_owner":
                 dataset_id = payload["dataset_id"]
                 for entry in self.ledger.entries:
-                    if entry.entry_type == "REGISTER_DATASET" and entry.payload.dataset_id == dataset_id:
+                    if entry.entry_type == LedgerEntryType.REGISTER_DATASET and entry.payload.dataset_id == dataset_id:
                         return {"status": "ok", "result": {"owner_id": entry.payload.owner_id}}
                 return {"status": "error", "error": f"No owner found for dataset_id: {dataset_id}"}
 

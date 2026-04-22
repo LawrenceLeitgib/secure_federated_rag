@@ -53,7 +53,7 @@ class RetrievalEngine:
         )
 
     async def query(self, query_text: str, k: int = 3) -> list[tuple[str, float, str]]:
-        query_embedding = self.embedder.embed_text(query_text, is_query=True)
+        query_embedding = await self.embedder.embed_text(query_text, is_query=True)
 
         queryResults = self.embeddings.search(query_embedding, k=k)
 

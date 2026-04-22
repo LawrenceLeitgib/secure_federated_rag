@@ -1,8 +1,19 @@
-# app/data_owner/client.py
 import asyncio
+import argparse
+from pathlib import Path
 import sys
 
 from app.data_owner.service import DataOwnerService
+
+
+WIKI_DATA_ROOT = Path("wiki_data_owners")
+WIKI_OWNER_FOLDERS = {
+    "dataOwner1": "data_owner_1_science",
+    "dataOwner2": "data_owner_2_history",
+    "dataOwner3": "data_owner_3_technology",
+    "dataOwner4": "data_owner_4_geography",
+    "dataOwner5": "data_owner_5_art_culture",
+}
 
 
 def prompt(msg: str) -> str:
@@ -12,11 +23,21 @@ def prompt(msg: str) -> str:
         return ""
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Start a data owner client.")
+    parser.add_argument(
+        "--name",
+        help="Owner name to use without prompting, for example dataOwner1.",
+    )
+    return parser.parse_args()
+
+
 async def main() -> None:
+    args = parse_args()
     service = DataOwnerService()
 
     # Step 1: create or load an owner
-    name = prompt("Enter your name (for this data owner): ").strip()
+    name = (args.name or prompt("Enter your name (for this data owner): ")).strip()
     if not name:
         print("Name is required. Exiting.")
         sys.exit(1)
@@ -29,9 +50,11 @@ async def main() -> None:
     print(f"  name      : {owner_info['name']}")
     print(f"  public_key: {owner_info['public_key'][:50]}...")
 
-    if(name == "test"):
+    if name == "test":
         #upload a test dataset
         await initialize_for_testing(service)
+    elif name in WIKI_OWNER_FOLDERS:
+        await initialize_wiki_data_owner(service, name)
 
     # Step 2: interactive loop
     while True:
@@ -91,6 +114,56 @@ async def main() -> None:
             break
         else:
             print("Unknown choice.")
+
+
+def load_wiki_article(path: Path) -> tuple[str, str]:
+    text = path.read_text(encoding="utf-8")
+    document_name = path.stem
+
+    for line in text.splitlines():
+        if line.startswith("TITLE: "):
+            document_name = line.removeprefix("TITLE: ").strip()
+            break
+
+    return document_name, text
+
+
+async def initialize_wiki_data_owner(service: DataOwnerService, owner_name: str) -> None:
+    folder_name = WIKI_OWNER_FOLDERS[owner_name]
+    owner_dir = WIKI_DATA_ROOT / folder_name
+
+    if not owner_dir.exists():
+        print(f"Wiki data folder not found: {owner_dir}")
+        return
+
+    article_paths = sorted(owner_dir.glob("*.txt"))
+    if not article_paths:
+        print(f"No wiki article files found in: {owner_dir}")
+        return
+
+    print(f"Uploading {len(article_paths)} wiki datasets for {owner_name} from {owner_dir}")
+
+    uploaded_datasets = []
+    for article_path in article_paths:
+        document_name, text = load_wiki_article(article_path)
+        dataset = await service.upload_text_document(
+            document_name=document_name,
+            text=text,
+        )
+        uploaded_datasets.append(dataset)
+        print(f"Uploaded {document_name} with id: {dataset['dataset_id']}")
+
+    result = await service.get_retrieval_engine_id()
+    status = result.get("status")
+    if status != "ok":
+        print(f"Error while getting retrieval engine id: {result.get('error')}")
+        return
+
+    re_id = result.get("result")
+    for dataset in uploaded_datasets:
+        await service.give_access(dataset_id=dataset["dataset_id"], re_id=re_id)
+        print(f"Granted access to dataset {dataset['dataset_id']} for retriever {re_id}")
+
 
 async def initialize_for_testing(service):
     result = await service.get_retrieval_engine_id()

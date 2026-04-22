@@ -63,7 +63,7 @@ class DataOwner:
             custodian_clients=custodian_clients,
             retrieval_client=retrieval_client,
             embedder=QwenEmbedder(),
-    )
+        )
 
     
     async def upload_document(
@@ -72,6 +72,13 @@ class DataOwner:
         text: str,
     ) -> Dataset:
         chunks = chunk_text(text)
+        chunk_embeddings = await self.embedder.embed_texts(
+            [chunk.text for chunk in chunks],
+            is_query=False,
+        )
+
+        for chunk, embedding in zip(chunks, chunk_embeddings):
+            chunk.embedding = embedding
 
        
         #creat a kek 
@@ -83,8 +90,6 @@ class DataOwner:
 
         for chunk in chunks:
             leaf_hashes.append(chunk.chunk_id)
-            chunk.embedding = self.embedder.embed_text(chunk.text,is_query=False)
-
 
             dek=generate_key()
             encrypted_chunk = encrypt_bytes(chunk.text.encode("utf-8"), dek)
@@ -147,6 +152,4 @@ class DataOwner:
         if dataset is None:
             raise KeyError(f"Dataset {dataset_id} not found for owner {self.user_id}")
         return [(chunk.chunk_id, chunk.embedding) for chunk in dataset.chunks]
-
-
 

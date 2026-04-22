@@ -5,6 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 
 MODULES = {
+    "embedding_server": ("app.retrieval.embedding_server", ""),
     "storage_server": ("app.storage.storage_server", ""),
     "blockchain_server": ("app.blockchain.blockchain_server", ""),
     # two custodian instances with different ports
@@ -31,6 +32,7 @@ def main() -> None:
     processes = []
 
     servers_order = [
+        "embedding_server",
         "storage_server",
         "blockchain_server",
         "custodian_1",

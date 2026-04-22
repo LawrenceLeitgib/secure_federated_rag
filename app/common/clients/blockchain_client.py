@@ -82,6 +82,7 @@ class BlockchainClient:
                 raise RuntimeError("Storage server closed connection")
 
             response = decode_message(line)
+            print(f"Response from get_dataset_owner: {response}")
             return response.get("result", {}).get("owner_id", "")
         finally:
             writer.close()
