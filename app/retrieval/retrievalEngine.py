@@ -107,6 +107,11 @@ class RetrievalEngine:
                 raw1.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0)
                 + raw2.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0),
             )
+            #remove blokchain_ms from custodian timings to avoid double counting
+            benchmark.increment_duration_ms(
+                "custodian_ms",
+                - raw1.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0)                - raw2.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0),
+            )
             
             if(raw1.get("result").get("authorized") == False or raw2.get("result").get("authorized") == False):
                 print(f"Not authorized to access chunk {chunk_id}")
@@ -152,19 +157,18 @@ class RetrievalEngine:
             print(f"Retrieved chunk for RAG: chunk_id={chunk_id[:10]}, score={score:.2f}, text={text}...")
 
         contexts = [text for _, _, text in retrieved]
+        benchmark = BenchmarkReport()
+
         llm_start = now()
         llm_response = self.llm.generate_answer(
             query=query_text,
             contexts=contexts,
         )
-        llm_ms = (now() - llm_start) * 1000.0
-
-        benchmark = BenchmarkReport()
+        benchmark.add_duration("llm_ms", llm_start)
         for name, value in retrieval_benchmark["timings_ms"].items():
             benchmark.set_duration_ms(name, value)
         for name, value in retrieval_benchmark["counters"].items():
             benchmark.set_counter(name, value)
-        benchmark.set_duration_ms("llm_ms", llm_ms)
         benchmark.add_duration("total_ms", total_start)
 
         return {

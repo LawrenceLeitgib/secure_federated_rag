@@ -46,26 +46,6 @@ class RetrievalEngineService:
         print(f"RetrievalEngineService received RAG query: {query_text}")
         return await self.engine.answer_query(query_text=query_text, k=k)
 
-    async def query(
-        self,
-        query_text: str,
-        k: int = 3,
-    ) -> list[dict[str, Any]]:
-        print(f"RetrievalEngineService received query: {query_text}")
-      
-        results= await self.engine.query(query_text=query_text, k=k)
-
-        #make it into a list of dicts with chunk_id, score and text
-        decrypted_results = [
-            {
-                "chunk_id": chunk_id,
-                "score": score,
-                "text": text
-            }
-            for chunk_id, score, text in results
-        ]
-
-        return decrypted_results
 
     async def _get_share_from_custodian(
         self,
