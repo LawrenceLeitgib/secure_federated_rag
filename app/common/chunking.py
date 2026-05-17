@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from app.common.crypto.hashing import sha256_text
 
 
-def chunk_text(text: str, min_size: int = 200, max_size: int = 400) -> list["Chunk"]:
+def chunkDocument(text: str, min_size: int = 200, max_size: int = 400) -> list["Chunk"]:
     if min_size <= 0:
         raise ValueError("min_size must be > 0")
     if max_size < min_size:

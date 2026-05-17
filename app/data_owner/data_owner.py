@@ -11,7 +11,7 @@ from app.common.crypto.signing import generate_key_pairs
 from app.common.crypto.symmetric import encrypt_bytes, generate_key
 from app.common.crypto.asymmetric import encrypt_with_public_key, generate_threshold_keys
 from app.common.ledger_interaction import register_dataset, register_user
-from app.common.chunking import Dataset, EncryptedChunk, chunk_text
+from app.common.chunking import Dataset, EncryptedChunk, chunkDocument
 from app.data_owner.merkle import build_merkle_root
 
 from app.common.clients.storage_client import StorageClient
@@ -87,7 +87,7 @@ class DataOwner:
         total_start = now()
 
         chunking_start = now()
-        chunks = chunk_text(text)
+        chunks = chunkDocument(text)
         benchmark.add_duration("chunking_ms", chunking_start)
         benchmark.set_counter("num_chunks", len(chunks))
 
