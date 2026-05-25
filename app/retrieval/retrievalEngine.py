@@ -7,6 +7,7 @@ from app.common.clients.blockchain_client import BlockchainClient
 from app.common.clients.custodian_client import CustodianClient
 from app.common.clients.storage_client import StorageClient
 from app.common.crypto.asymmetric import decrypt_with_shares
+from app.common.crypto.hashing import sha256_text
 from app.common.crypto.signing import generate_key_pairs
 from app.common.crypto.symmetric import decrypt_bytes
 from app.common.ledger_interaction import register_user
@@ -139,6 +140,10 @@ class RetrievalEngine:
             benchmark.increment_duration_ms("decryption_ms", benchmark.add_duration("_tmp_decryption_ms", decryption_start))
             benchmark.timings_ms.pop("_tmp_decryption_ms", None)
             
+            #verify the text hash matches the chunk_id to ensure integrity and correct decryption
+            if sha256_text(text) != chunk_id:
+                print(f"Decrypted text hash mismatch for chunk {chunk_id}: expected {chunk_id}, got {sha256_text(text)}")
+                continue
            
             decrypted_results.append(
                 (chunk_id, score, text)

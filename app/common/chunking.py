@@ -51,7 +51,7 @@ def chunkDocument(text: str, min_size: int = 200, max_size: int = 400) -> list["
             # Include position index so identical text at different positions gets
             # a distinct chunk_id, preventing storage key collisions and ledger map
             # entries from silently overwriting each other.
-            chunk_id = sha256_text(f"{len(chunks)}:{chunk_text_value}")
+            chunk_id = sha256_text(f"{chunk_text_value}")
             chunks.append(
                 Chunk(
                     chunk_id=chunk_id,
