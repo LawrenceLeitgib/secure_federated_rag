@@ -120,7 +120,7 @@ class RetrievalEngine:
             for item in results.values()
         )
         benchmark.set_duration_ms("blockchain_ms", total_blockchain_ms)
-        #benchmark.increment_duration_ms("custodian_ms", -total_blockchain_ms)
+        benchmark.increment_duration_ms("custodian_ms", -total_blockchain_ms/2)
 
         # Phase 3: Decrypt each authorized chunk
         decrypted_results: list[tuple[str, float, str]] = []
