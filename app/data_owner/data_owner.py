@@ -8,7 +8,7 @@ from typing import List, Optional
 from app.common.benchmarking import BenchmarkReport, now
 from app.common.crypto.hashing import sha256_text
 from app.common.crypto.signing import generate_key_pairs
-from app.common.crypto.symmetric import encrypt_bytes, generate_key
+from app.common.crypto.symmetric import  encrypt_bytes, generate_key
 from app.common.crypto.asymmetric import encrypt_with_public_key, generate_threshold_keys
 from app.common.ledger_interaction import register_dataset, register_user
 from app.common.chunking import Dataset, EncryptedChunk, chunkDocument
@@ -109,11 +109,14 @@ class DataOwner:
 
         encrypted_chunks: list[EncryptedChunk] = []
 
+        #master_key = generate_key()
+
         encryption_start = now()
         for chunk in chunks:
             leaf_hashes.append(chunk.chunk_id)
 
-            dek=generate_key()
+            #dek = derive_chunk_key(master_key, chunk.chunk_id)
+            dek= generate_key()
             encrypted_chunk = encrypt_bytes(chunk.text.encode("utf-8"), dek)
 
             encrypted_dek = encrypt_with_public_key(dek.hex(), public_kek)

@@ -1,9 +1,23 @@
-import os
+import base64
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
 
 
 def generate_key() -> bytes:
     return Fernet.generate_key()
+
+
+def derive_chunk_key(master_key: bytes, chunk_id: str) -> bytes:
+    """Derive a Fernet-compatible DEK from a master key using HKDF, with chunk_id as context."""
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=chunk_id.encode("utf-8"),
+    )
+    raw_key = hkdf.derive(master_key)
+    return base64.urlsafe_b64encode(raw_key)
 
 
 def encrypt_bytes(data: bytes, key: bytes) -> bytes:
