@@ -53,7 +53,7 @@ class RetrievalEngineTCPServer:
 
                 rag_results = await self.service.answer_query(
                     query_text=query_text,
-                    k=3,
+                    k=10,
                 )
                 print(f"RetrievalEngineTCPServer returning final answer for query: {query_text}")
                 return {

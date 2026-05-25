@@ -96,6 +96,22 @@ class CustodianTCPServer:
                     },
                 }
 
+            elif action == "batch_get_partial_decryption":
+                items = payload["items"]
+                results: dict[str, Any] = {}
+                for item in items:
+                    chunk_id = item["chunk_id"]
+                    re_id_item: str = item["re_id"]
+                    encrypted_dek: str = item["encrypted_dek"]
+                    partial, authorised, bench = await self.service.get_partial_decryption(re_id_item, chunk_id, encrypted_dek)
+                    results[chunk_id] = {
+                        "found": partial is not None and authorised,
+                        "authorized": authorised,
+                        "partial_decryption": partial,
+                        "benchmark": bench,
+                    }
+                return {"status": "ok", "result": results}
+
             elif action == "ping":
                 return {"status": "ok", "result": "pong"}
 

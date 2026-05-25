@@ -55,3 +55,33 @@ class CustodianClient:
         finally:
             writer.close()
             await writer.wait_closed()
+
+    async def get_partial_decryptions_batch(
+        self,
+        re_id: str,
+        items: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        """Send a single batch request for multiple chunks.
+
+        items: list of {"chunk_id": str, "encrypted_dek": str}
+        Returns {"status": "ok", "result": {chunk_id: {found, authorized, partial_decryption, benchmark}}}
+        """
+        reader, writer = await asyncio.open_connection(self.host, self.port)
+        try:
+            payload = {
+                "re_id": re_id,
+                "items": [{"chunk_id": item["chunk_id"], "re_id": re_id, "encrypted_dek": item["encrypted_dek"]} for item in items],
+            }
+            request = {"action": "batch_get_partial_decryption", "payload": payload}
+            writer.write(encode_message(request))
+            await writer.drain()
+
+            line = await reader.readline()
+            if not line:
+                raise RuntimeError("Custodian server closed connection")
+
+            response = decode_message(line)
+            return response
+        finally:
+            writer.close()
+            await writer.wait_closed()

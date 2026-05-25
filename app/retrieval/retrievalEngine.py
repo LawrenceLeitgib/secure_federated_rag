@@ -77,57 +77,73 @@ class RetrievalEngine:
 
         print(f"RetrievalEngine found {len(queryResults)} results for query: {query_text}")
 
-       
-       
+        # Phase 1: Fetch all chunks from storage in parallel
+        storage_start = now()
+        storage_responses = await asyncio.gather(
+            *[self.storage_client.retrieve_chunk_async(chunk_id) for chunk_id, _ in queryResults]
+        )
+        benchmark.add_duration("storage_provider_ms", storage_start)
+
+        valid_chunks: list[dict] = []
+        for (chunk_id, score), resp in zip(queryResults, storage_responses):
+            if resp.get("status") != "ok":
+                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from storage server")
+            result = resp.get("result", {})
+            valid_chunks.append({
+                "chunk_id": chunk_id,
+                "score": score,
+                "encrypted_dek": result.get("encrypted_dek"),
+                "encrypted_data": result.get("encrypted_data"),
+            })
+
+        # Phase 2: Batch-request partial decryptions from both custodians concurrently
+        batch_items = [{"chunk_id": c["chunk_id"], "encrypted_dek": c["encrypted_dek"]} for c in valid_chunks]
+        custodian_start = now()
+        raw1_resp, raw2_resp = await asyncio.gather(
+            self.custodian_clients[0].get_partial_decryptions_batch(self.re_id, batch_items),
+            self.custodian_clients[1].get_partial_decryptions_batch(self.re_id, batch_items),
+        )
+        benchmark.add_duration("custodian_ms", custodian_start)
+
+        if raw1_resp.get("status") != "ok":
+            raise RuntimeError(f"Batch request to custodian 1 failed: {raw1_resp.get('error')}")
+        if raw2_resp.get("status") != "ok":
+            raise RuntimeError(f"Batch request to custodian 2 failed: {raw2_resp.get('error')}")
+
+        raw1_results: dict = raw1_resp.get("result", {})
+        raw2_results: dict = raw2_resp.get("result", {})
+
+        # Extract total blockchain_ms reported by custodians and remove from custodian_ms to avoid double-counting
+        total_blockchain_ms = sum(
+            item.get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0)
+            for results in (raw1_results, raw2_results)
+            for item in results.values()
+        )
+        benchmark.set_duration_ms("blockchain_ms", total_blockchain_ms)
+        #benchmark.increment_duration_ms("custodian_ms", -total_blockchain_ms)
+
+        # Phase 3: Decrypt each authorized chunk
         decrypted_results: list[tuple[str, float, str]] = []
 
-        for chunk_id, score in queryResults:
-            storage_start = now()
-            encrypted_chunk_payload = await self.storage_client.retrieve_chunk_async(chunk_id)
-            benchmark.increment_duration_ms("storage_provider_ms", benchmark.add_duration("_tmp_storage_ms", storage_start))
-            benchmark.timings_ms.pop("_tmp_storage_ms", None)
-            if encrypted_chunk_payload.get("status") != "ok":
-                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from storage server")
+        for chunk in valid_chunks:
+            chunk_id = chunk["chunk_id"]
+            score = chunk["score"]
 
-            custodian1_start = now()
-            raw1=await self.custodian_clients[0].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id,encrypted_dek=encrypted_chunk_payload.get("result").get("encrypted_dek"))
-            benchmark.increment_duration_ms("custodian_ms", benchmark.add_duration("_tmp_custodian1_ms", custodian1_start))
-            benchmark.timings_ms.pop("_tmp_custodian1_ms", None)
-            if raw1.get("status") != "ok":
-                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 1")
+            r1 = raw1_results.get(chunk_id, {})
+            r2 = raw2_results.get(chunk_id, {})
 
-            custodian2_start = now()
-            raw2=await self.custodian_clients[1].get_partial_decryption(re_id=self.re_id, chunk_id=chunk_id,encrypted_dek=encrypted_chunk_payload.get("result").get("encrypted_dek"))
-            benchmark.increment_duration_ms("custodian_ms", benchmark.add_duration("_tmp_custodian2_ms", custodian2_start))
-            benchmark.timings_ms.pop("_tmp_custodian2_ms", None)
-            if raw2.get("status") != "ok":
-                raise RuntimeError(f"Failed to retrieve chunk {chunk_id} from custodian 2")
-
-            benchmark.increment_duration_ms(
-                "blockchain_ms",
-                raw1.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0)
-                + raw2.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0),
-            )
-            #remove blokchain_ms from custodian timings to avoid double counting
-            benchmark.increment_duration_ms(
-                "custodian_ms",
-                - raw1.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0)                - raw2.get("result", {}).get("benchmark", {}).get("timings_ms", {}).get("blockchain_ms", 0.0),
-            )
-            
-            if(raw1.get("result").get("authorized") == False or raw2.get("result").get("authorized") == False):
+            if not r1.get("authorized", False) or not r2.get("authorized", False):
                 print(f"Not authorized to access chunk {chunk_id}")
                 continue
-            if(raw1.get("result").get("found") == False or raw2.get("result").get("found") == False):
+            if not r1.get("found", False) or not r2.get("found", False):
                 print(f"DEK for chunk {chunk_id} not found in custodian")
-                continue   
- 
-            encrypted_chunk = encrypted_chunk_payload.get("result").get("encrypted_data")
-            encrypted_dek = tc.EncryptedMessage.from_json(encrypted_chunk_payload.get("result").get("encrypted_dek"))
+                continue
 
-            partial_decryption1 = tc.PartialDecryption.from_json(raw1.get("result").get("partial_decryption"))
-            partial_decryption2 = tc.PartialDecryption.from_json(raw2.get("result").get("partial_decryption"))
-           
-            # Combine partial decryptions to get the DEK
+            encrypted_chunk = chunk["encrypted_data"]
+            encrypted_dek = tc.EncryptedMessage.from_json(chunk["encrypted_dek"])
+            partial_decryption1 = tc.PartialDecryption.from_json(r1.get("partial_decryption"))
+            partial_decryption2 = tc.PartialDecryption.from_json(r2.get("partial_decryption"))
+
             decryption_start = now()
             dek = decrypt_with_shares(
                 encrypted_dek=encrypted_dek,
@@ -136,18 +152,15 @@ class RetrievalEngine:
                 t=2,
                 n=2,
             )
-            text=decrypt_bytes(bytes.fromhex(encrypted_chunk), bytes.fromhex(dek)).decode("utf-8")
+            text = decrypt_bytes(bytes.fromhex(encrypted_chunk), bytes.fromhex(dek)).decode("utf-8")
             benchmark.increment_duration_ms("decryption_ms", benchmark.add_duration("_tmp_decryption_ms", decryption_start))
             benchmark.timings_ms.pop("_tmp_decryption_ms", None)
-            
-            #verify the text hash matches the chunk_id to ensure integrity and correct decryption
+
             if sha256_text(text) != chunk_id:
                 print(f"Decrypted text hash mismatch for chunk {chunk_id}: expected {chunk_id}, got {sha256_text(text)}")
                 continue
-           
-            decrypted_results.append(
-                (chunk_id, score, text)
-            )
+
+            decrypted_results.append((chunk_id, score, text))
 
         benchmark.set_counter("authorized_result_count", len(decrypted_results))
         benchmark.add_duration("retrieval_total_ms", total_start)
