@@ -39,8 +39,8 @@ def find_wiki_file(owner_name: str, document_name: str, wiki_dir: Path) -> Path 
     return None
 
 
-def count_words(path: Path) -> int:
-    return len(path.read_text(encoding="utf-8").split())
+def count_chars(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8"))
 
 
 def clean_label(name: str) -> str:
@@ -63,14 +63,13 @@ def compute_weighted_average(
     excluded_timings: set[str],
 ) -> tuple[list[str], list[float], list[float]] | None:
     """
-    Compute the word-count-weighted average ms per 1000 words for each component.
+    Compute the char-count-weighted average ms per 1M characters for each component.
 
-    Returns (labels, values_per_1000w, percentages) or None if no data.
+    Returns (labels, values_per_1m_chars, percentages) or None if no data.
     """
     total_ms_per_comp: dict[str, float] = {}
-    total_words = 0
+    total_chars = 0
 
-    print("Processing results:", len(results), "documents")
     for entry in results:
         owner = entry.get("owner_name", "")
         doc_name = entry.get("document_name", "")
@@ -81,29 +80,26 @@ def compute_weighted_average(
             print(f"  Warning: no wiki file found for {owner}/{doc_name}")
             continue
 
-        word_count = count_words(wiki_file)
-        print(f"  {owner}/{doc_name}: {word_count} words")
-        if word_count == 0:
+        char_count = count_chars(wiki_file)
+        if char_count == 0:
             continue
 
-        total_words += word_count
+        total_chars += char_count
         for k, v in timings.items():
             if k not in excluded_timings and v > 0:
                 total_ms_per_comp[k] = total_ms_per_comp.get(k, 0.0) + v
 
-    print(f"Total words across all documents: {total_words}")
-
-
-    if total_words == 0 or not total_ms_per_comp:
+    if total_chars == 0 or not total_ms_per_comp:
         return None
+    print(f"Total characters across all documents: {total_chars}")
 
     included = [(k, v) for k, v in total_ms_per_comp.items() if v > 0]
     grand_total = sum(v for _, v in included)
 
     labels = [clean_label(k) for k, _ in included]
-    values_per_1000w = [(v / total_words) * 1000 for _, v in included]
+    values_per_1m_chars = [(v / total_chars) * 1_000_000 for _, v in included]
     percentages = [(v / grand_total) * 100 for _, v in included]
-    return labels, values_per_1000w, percentages
+    return labels, values_per_1m_chars, percentages
 
 
 def generate_graph(
@@ -124,28 +120,33 @@ def generate_graph(
     result = compute_weighted_average(results, wiki_dir, excluded_timings)
     if result is None:
         return None
-    labels, values_per_1000w, percentages = result
+    labels, values_per_1m_chars, percentages = result
 
-    title = f"Upload Pipeline: Component Time per 1 000 Words\n({subtitle})"
+    print(f"\n{json_path.name} — {subtitle}:")
+    for label, val, pct in zip(labels, values_per_1m_chars, percentages):
+        print(f"  {label}: {val:.1f} ms/Mc ({pct:.1f}%)")
+    print(f"  Total: {sum(values_per_1m_chars):.1f} ms/Mc")
+
+    title = f"Upload Pipeline: Component Time per 1 M Characters\n({subtitle})"
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    bars = ax.bar(labels, values_per_1000w, color="#4C72B0", edgecolor="white", linewidth=0.7)
+    bars = ax.bar(labels, values_per_1m_chars, color="#4C72B0", edgecolor="white", linewidth=0.7)
 
-    ax.set_ylabel("ms per 1 000 words", fontsize=12)
+    ax.set_ylabel("ms per 1 M characters", fontsize=12)
     ax.set_xlabel("Component", fontsize=12)
     ax.set_title(title, fontsize=13, fontweight="bold")
     ax.tick_params(axis="x", rotation=30, labelsize=10)
     ax.tick_params(axis="y", labelsize=10)
     plt.setp(ax.get_xticklabels(), ha="right")
-    ax.set_ylim(0, max(values_per_1000w) * 1.3)
+    ax.set_ylim(0, max(values_per_1m_chars) * 1.3)
     ax.yaxis.grid(True, linestyle="--", alpha=0.6)
     ax.set_axisbelow(True)
 
-    for bar, val, pct in zip(bars, values_per_1000w, percentages):
+    for bar, val, pct in zip(bars, values_per_1m_chars, percentages):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + max(values_per_1000w) * 0.015,
-            f"{val:.2f} ms/kw\n({pct:.1f}%)",
+            bar.get_height() + max(values_per_1m_chars) * 0.015,
+            f"{val:.1f} ms/Mc\n({pct:.1f}%)",
             ha="center",
             va="bottom",
             fontsize=9,
@@ -180,7 +181,7 @@ def main() -> None:
             wiki_dir=args.wiki_dir,
             output_dir=args.output_dir,
             excluded_timings=BASE_EXCLUDED_TIMINGS,
-            filename_suffix="per_1000_words_with_embedding",
+            filename_suffix="per_1m_chars_with_embedding",
             subtitle="including embedding generation",
         )
         without_embedding = generate_graph(
@@ -188,7 +189,7 @@ def main() -> None:
             wiki_dir=args.wiki_dir,
             output_dir=args.output_dir,
             excluded_timings=BASE_EXCLUDED_TIMINGS | {"embedding_generation_ms"},
-            filename_suffix="per_1000_words_without_embedding",
+            filename_suffix="per_1m_chars_without_embedding",
             subtitle="excluding embedding generation",
         )
 
