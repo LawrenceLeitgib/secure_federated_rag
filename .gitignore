@@ -4,5 +4,7 @@ wiki_data_owners/
 .codex
 test.txt
 bench_mark_result/
+bench_mark_result_old/
 bench_mark_result_graphs/
+bench_mark_result_graphs_old/
 /report

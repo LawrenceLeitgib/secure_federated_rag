@@ -98,18 +98,34 @@ class CustodianTCPServer:
 
             elif action == "batch_get_partial_decryption":
                 items = payload["items"]
-                results: dict[str, Any] = {}
-                for item in items:
+
+                async def process_item(item: dict[str, Any]) -> tuple[str, dict[str, Any]]:
                     chunk_id = item["chunk_id"]
-                    re_id_item: str = item["re_id"]
-                    encrypted_dek: str = item["encrypted_dek"]
-                    partial, authorised, bench = await self.service.get_partial_decryption(re_id_item, chunk_id, encrypted_dek)
-                    results[chunk_id] = {
+                    partial, authorised, bench = await self.service.get_partial_decryption(
+                        item["re_id"], chunk_id, item["encrypted_dek"]
+                    )
+                    return chunk_id, {
                         "found": partial is not None and authorised,
                         "authorized": authorised,
                         "partial_decryption": partial,
                         "benchmark": bench,
                     }
+
+                outcomes = await asyncio.gather(
+                    *[process_item(item) for item in items],
+                    return_exceptions=True,
+                )
+                results: dict[str, Any] = {}
+                for item, outcome in zip(items, outcomes):
+                    if isinstance(outcome, Exception):
+                        results[item["chunk_id"]] = {
+                            "found": False,
+                            "authorized": False,
+                            "error": str(outcome),
+                        }
+                    else:
+                        chunk_id, result = outcome
+                        results[chunk_id] = result
                 return {"status": "ok", "result": results}
 
             elif action == "ping":

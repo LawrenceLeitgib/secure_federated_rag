@@ -16,7 +16,7 @@ DEFAULT_QUERIES = [
     "What is artificial intelligence?",
     "What is a continent?",
     "What defines classical music?",
-]
+]*20  # Repeat to increase the number of queries for benchmarking
 
 
 def parse_args() -> argparse.Namespace:

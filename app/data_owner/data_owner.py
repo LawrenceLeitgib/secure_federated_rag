@@ -172,8 +172,11 @@ class DataOwner:
         print(f"Registered dataset on blockchain with result: {r}")
 
         custodian_start = now()
-        await self.custodian_clients[0].store_share(self.user_id, merkle_root, shares[0])
-        await self.custodian_clients[1].store_share(self.user_id, merkle_root, shares[1])
+        #batch the two call into a single gather to run in parallel
+        await asyncio.gather(
+            self.custodian_clients[0].store_share(self.user_id, merkle_root, shares[0]),
+            self.custodian_clients[1].store_share(self.user_id, merkle_root, shares[1])
+        )
         benchmark.add_duration("custodian_share_distribution_ms", custodian_start)
 
         self.dataset_list.append(dataset)
