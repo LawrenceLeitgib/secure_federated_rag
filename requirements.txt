@@ -1,3 +1,7 @@
 numpy
 cryptography
 matplotlib
+datasets==4.8.4
+threshold-crypto==0.3.0
+torch==2.10.0
+transformers==5.3.0
