@@ -1,6 +1,6 @@
 # Secure Federated RAG
 
-A privacy-preserving, distributed Retrieval-Augmented Generation (RAG) system built as an EPFL MA2 semester project. Multiple independent data owners can securely share their documents through a federated retrieval system, while maintaining cryptographic confidentiality and fine-grained access control.
+A privacy-preserving, distributed Retrieval-Augmented Generation (RAG) system built as an EPFL MASTER semester project in IC. Multiple independent data owners can securely share their documents through a federated retrieval system, while maintaining cryptographic confidentiality and fine-grained access control.
 
 ---
 
@@ -23,15 +23,14 @@ Query:    question  → embed → vector search → auth check → decrypt → L
 
 ## Architecture
 
-The system is composed of six independent services and two interactive clients:
+The system is composed of five independent services and two interactive clients:
 
 | Component | Port | Role |
 |-----------|------|------|
 | Embedding Server | 11001 | Shared Qwen3 embedding service |
 | Storage Server | 7001 | Stores encrypted document chunks |
 | Blockchain Server | 8001 | In-memory authorization ledger |
-| Custodian 1 | 9001 | Holds threshold key shares |
-| Custodian 2 | 9002 | Holds threshold key shares |
+| Custodian i | 900{i} | Holds threshold key shares |
 | Retrieval Server | 10001 | Query processing and answer generation |
 
 All services communicate over a simple JSON-line TCP protocol.
@@ -39,10 +38,12 @@ All services communicate over a simple JSON-line TCP protocol.
 ### Actors
 
 - **Data Owner** — uploads documents, sets access policies, distributes key shares to custodians
-- **Custodian** — holds a threshold share of decryption keys; both custodians must cooperate to decrypt
+- **Custodian** — holds a threshold share of decryption keys; use a t-of-n threshold parameterize to any t and n, this prototype as default set to 2-of-2
 - **Retrieval Engine** — embeds queries, searches the vector index, reconstructs keys, generates answers
 - **User** — submits natural language queries to the retrieval engine
 - **Blockchain Ledger** — immutable record of user registrations, dataset metadata, and access grants
+- **Storage Server** — Stores encrypted document chunks
+
 
 ---
 
@@ -185,7 +186,7 @@ Key parameters and where to change them:
 | Embedding model | `app/retrieval/embeddings.py` | `Qwen/Qwen3-Embedding-0.6B` |
 | LLM model | `app/retrieval/llm.py` | `Qwen/Qwen3-0.6B` |
 | Max answer tokens | `app/retrieval/llm.py` | 256 |
-| Top-k chunks for RAG | `app/retrieval/llm.py` | 3 |
+| Top-k chunks for RAG | `app/retrieval/llm.py` | 10 |
 | Chunk size | `app/common/chunking.py` | 200–400 characters |
 | Threshold scheme | `app/custodians/custodian.py` | 2-of-2 |
 
